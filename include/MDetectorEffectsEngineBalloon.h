@@ -122,6 +122,10 @@ public:
  
   //! Initialize the module
   bool Initialize();
+  //! Get Deadtime for Shields
+  double dTimeShields(int detectors_activated = 0);
+  //! Get Deadtime for GeDs
+  double dTimeGeDs(vector<int> channels);
   //! Analyze whatever needs to be analyzed...
   bool GetNextEvent(MReadOutAssembly* Event);
   //! Finalize the module
@@ -255,10 +259,14 @@ private:
 	static const int nDets = 12;
 	//! number of sides
 	static const int nSides = 2;
+  //! number of ASICs to readout the strips
+  static const int nASICs = nDets * nSides;
 	//! number of strips
 	static const int nStrips = 37;
 	//! slots in DSP dead time buffer
 	static const int nDTBuffSlots = 16;
+  //! number of shield detectors
+  static const int nShieldDets = 6;
  
   //! The DEE internal random number generator
   TRandom m_Random;
@@ -293,8 +301,11 @@ private:
   
 	//! Dead time buffer with 16 slots
 	vector<vector<double> > m_DeadTimeBuffer = vector<vector<double> >(nDets, vector<double> (nDTBuffSlots));
-  //! Stores dead time for each detector
   vector<double> m_CCDeadTime = vector<double>(nDets);
+  //! Stores dead time for each detector
+  vector<double> m_ASICDeadTime = vector<double>(nDets);
+  // //! Channels that were activated within delay time window, need 1 for each ASIC? Make a dictionary?
+  // vector<double> m_channelsGeDASIC = vector<double>(1);
 	//! Stores last hit time for any detector
 	double m_LastHitTime;
   //! Stores last time detector was hit to check if detector still dead
@@ -311,11 +322,27 @@ private:
 	int m_MaxBufferFullIndex;
 	int m_MaxBufferDetector;
 
-	//! dead time on the shields
-  double m_ShieldDeadTime;
+
+  //! delay time on GeDs
+  double m_StripDelay;
+  //! dead time on GeDs
+  double m_StripDeadTime;
+	//! dead time on the shield group 1
+  double m_ShieldDeadTime1;
+	//! dead time on the shield group 2
+  double m_ShieldDeadTime2;
+	//! dead time on the shield group 3
+  double m_ShieldDeadTime3;
+  //! total dead time on shield group 1
+  double m_TotalShieldDeadTime1;
+    //! total dead time on shield group 2
+  double m_TotalShieldDeadTime2;
+    //! total dead time on shield group 3
+  double m_TotalShieldDeadTime3;
+
 	//! whether or not the event is vetoed by the shields
 	bool m_ShieldVeto;
-	//! shield threshold
+	//! shield thresholdx
 	double m_ShieldThreshold;
   
   //! List of dead strips
@@ -339,12 +366,24 @@ private:
   unsigned long m_ChargeLossCounter;
   
   double m_ShieldPulseDuration;
+  double m_ShieldDelayBefore;
+  double m_ShieldDelayAfter;
+  double m_ASICDeadTimePerChannel;
   double m_CCDelay;
+  double m_ShieldDeadTimeAdd;
+  double m_ASICDeadTimeAdd;
   double m_ShieldTime;
+  double m_LastGoodHitShieldTime;
 	double m_ShieldDelay;
 	double m_ShieldVetoWindowSize;
+  int m_lastGoodEventNumber;
   bool m_IsShieldDead;
-  
+  int activated1;
+  int activated2;
+  int activated3;
+  double GeD_deadtime;
+
+
   long m_NumShieldCounts;
   
 	//! drift constant: used for charge sharing due to diffusion; one for each detector

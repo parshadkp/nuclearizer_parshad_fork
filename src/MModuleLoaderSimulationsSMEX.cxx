@@ -148,6 +148,8 @@ bool MModuleLoaderSimulationsSMEX::AnalyzeEvent(MReadOutAssembly* Event)
 void MModuleLoaderSimulationsSMEX::Finalize()
 {
   // Initialize the module 
+  
+  MModule::Finalize();
 
   MSupervisor* S = MSupervisor::GetSupervisor();
   MModuleEventSaver* Saver = dynamic_cast<MModuleEventSaver*>(S->GetAvailableModuleByXmlTag("XmlTagEventSaver"));

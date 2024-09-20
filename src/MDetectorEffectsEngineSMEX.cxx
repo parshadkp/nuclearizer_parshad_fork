@@ -84,6 +84,7 @@ MDetectorEffectsEngineSMEX::MDetectorEffectsEngineSMEX()
   m_ShowProgressBar = false;
   m_SaveToFile = false;
   m_ApplyFudgeFactor = true;
+  m_ChargeLossHist = nullptr;
 }
 
 
@@ -96,6 +97,27 @@ MDetectorEffectsEngineSMEX::~MDetectorEffectsEngineSMEX()
   // Intentionally left blank
   
   if (m_OwnGeometry == true) delete m_Geometry;
+
+  for (auto& C: m_EnergyCalibration) {
+    delete C.second;
+  }
+  
+  for (auto& C: m_ResolutionCalibration) {
+    delete C.second;
+  }
+  
+  // automaytically deleted
+  //for (auto& C: m_FSTThresholds) {
+  //  delete C.second;
+  //}
+  
+  //for (auto& V1: m_ChargeSharingFactors) {
+  //  for (auto& V2: V1) {
+  //    delete V2; 
+  //  }
+  //}
+  
+  //delete m_ChargeLossHist;
 }
 
 
@@ -204,7 +226,7 @@ bool MDetectorEffectsEngineSMEX::Initialize()
   m_MultipleHitsCounter = 0;
   m_TotalHitsCounter = 0;
   m_ChargeLossCounter = 0;
-  
+
   // for shield veto: shield pulse duration and card cage delay: constant for now
   m_ShieldThreshold = 80.;
   m_ShieldPulseDuration = 1.7e-6;
@@ -313,7 +335,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
           HT->SetEnergy(energy);
           
           if (energy > m_ShieldThreshold) {
-            if (m_ShieldTime + m_ShieldPulseDuration < evt_time){ hasShieldHits = true; }
+            if (m_ShieldTime + m_ShieldVetoWindowSize < evt_time){ hasShieldHits = true; }
             increaseShieldDeadTime = true;
             //this is handling paralyzable dead time
             m_ShieldTime = evt_time;
@@ -326,6 +348,20 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
     if (hasShieldHits == true){ m_NumShieldCounts++; }
     if (increaseShieldDeadTime == true){ m_ShieldDeadTime += m_ShieldPulseDuration; }
     
+    // //3 cases to veto events:
+    // //(1) shield active starts in veto window
+    // //(2) shield active ends in veto window
+    // //(3) shield active during the entire veto window
+    // //this if statement could perhaps be condensed but I'm less confused this way
+    // if ((m_ShieldTime + m_ShieldDelay > evt_time + m_CCDelay && m_ShieldTime + m_ShieldDelay < evt_time + m_CCDelay + m_ShieldVetoWindowSize) || 
+    //   (m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_CCDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_CCDelay + m_ShieldVetoWindowSize) || 
+    //   (m_ShieldTime + m_ShieldDelay < evt_time + m_CCDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_CCDelay + m_ShieldVetoWindowSize)){
+    //   // 		  delete SimEvent;
+    //   //      continue;
+    //   //don't delete the event yet: need to apply dead time to the card cage first!
+    //   m_ShieldVeto = true;
+    //   }
+
     //3 cases to veto events:
     //(1) shield active starts in veto window
     //(2) shield active ends in veto window
@@ -592,10 +628,10 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
             // We need both to know when we are in the guard ring
             int nStripIDinterim = (int) floor((DriftX + xInDet)*xInvDetectorPitch);
             int pStripIDinterim = (int) floor((DriftY + yInDet)*yInvDetectorPitch);
-            if (nStripIDinterim < 0 || nStripIDinterim > 63 || pStripIDinterim < 0 || pStripIDinterim > 63) {
-              nStripID = 65;
+            if (nStripIDinterim < 0 || nStripIDinterim > 36 || pStripIDinterim < 0 || pStripIDinterim > 36) {
+              nStripID = 38;
             } else {
-              nStripID = 64 - nStripIDinterim; 
+              nStripID = 37 - nStripIDinterim; 
             }
 
             
@@ -611,10 +647,10 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
             
             nStripIDinterim = (int) floor((DriftX + xInDet)*xInvDetectorPitch);
             pStripIDinterim = (int) floor((DriftY + yInDet)*yInvDetectorPitch);
-            if (nStripIDinterim < 0 || nStripIDinterim > 63 || pStripIDinterim < 0 || pStripIDinterim > 63) {
-              pStripID = 65;
+            if (nStripIDinterim < 0 || nStripIDinterim > 36 || pStripIDinterim < 0 || pStripIDinterim > 36) {
+              pStripID = 38;
             } else {
-              pStripID = 64 - pStripIDinterim; 
+              pStripID = 37 - pStripIDinterim; 
             }
             
             
@@ -1222,6 +1258,10 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
     T = SimEvent->GetTime().GetAsSeconds();
   }
   */
+
+      if (MergedStripHits.size() == 0){
+        cout<<"Nothing left before 6.5"<<endl;
+      }
       
       
       //Step (6.5): Dead time
@@ -1687,7 +1727,14 @@ double MDetectorEffectsEngineSMEX::NoiseShieldEnergy(double energy, MString shie
 ////////////////////////////////////////////////////////////////////////////////
 
 //! Calculate new summed energy of two strips affected by charge loss
-vector<double> MDetectorEffectsEngineSMEX::ApplyChargeLoss(double energy1, double energy2, int detID, int side, double depth1, double depth2){
+vector<double> MDetectorEffectsEngineSMEX::ApplyChargeLoss(double energy1, double energy2, int detID, int side, double depth1, double depth2)
+{
+  vector<double> retEnergy;
+  if (energy1 == 0 && energy2 == 0) {
+    retEnergy.push_back(0);
+    retEnergy.push_back(0);
+    return retEnergy;
+  }
   
   double trueSum = energy1+energy2;
   double diff = abs(energy1-energy2);
@@ -1725,7 +1772,7 @@ vector<double> MDetectorEffectsEngineSMEX::ApplyChargeLoss(double energy1, doubl
   
   m_ChargeLossHist->Fill(trueSum,sumDiff);
   
-  vector<double> retEnergy;
+  // vector<double> retEnergy;
   
   retEnergy.push_back(newE1);
   retEnergy.push_back(newE2);

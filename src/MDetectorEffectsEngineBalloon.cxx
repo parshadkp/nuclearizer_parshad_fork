@@ -2,7 +2,7 @@
  * MDetectorEffectEngine.cxx
  *
  *
- * Copyright (C) by Clio Sleator, Carolyn Kierans, Andreas Zoglauer.
+ * Copyright (C) by Clio Sleator, Carolyn Kierans, Andreas Zoglauer, Parshad Patel.
  * All rights reserved.
  *
  *
@@ -97,7 +97,7 @@ MDetectorEffectsEngineBalloon::~MDetectorEffectsEngineBalloon()
   // Intentionally left blank
   
   if (m_OwnGeometry == true) delete m_Geometry;
-  
+
   for (auto& C: m_EnergyCalibration) {
     delete C.second;
   }
@@ -105,19 +105,6 @@ MDetectorEffectsEngineBalloon::~MDetectorEffectsEngineBalloon()
   for (auto& C: m_ResolutionCalibration) {
     delete C.second;
   }
-  
-  // automaytically deleted
-  //for (auto& C: m_FSTThresholds) {
-  //  delete C.second;
-  //}
-  
-  //for (auto& V1: m_ChargeSharingFactors) {
-  //  for (auto& V2: V1) {
-  //    delete V2; 
-  //  }
-  //}
-  
-  //delete m_ChargeLossHist;
 }
 
 
@@ -165,9 +152,17 @@ bool MDetectorEffectsEngineBalloon::Initialize()
   //load crosstalk coefficients
   if (ParseCrosstalkFile() == false) return false;
   
+  // //initialize dead time and trigger rates
+  // for (int i=0; i<nASICs; i++){
+  //   m_ASICDeadTime[i] = 0; m_TotalDeadTime[i] = 0.; m_TriggerRates[i]=0;
+  //   for (int j=0; j<nDTBuffSlots; j++){
+  //     m_DeadTimeBuffer[i][j] = -1;
+  //   }
+  // }
+
   //initialize dead time and trigger rates
   for (int i=0; i<nDets; i++){
-    m_CCDeadTime[i] = 0; m_TotalDeadTime[i] = 0.; m_TriggerRates[i]=0;
+    m_ASICDeadTime[i] = 0; m_TotalDeadTime[i] = 0.; m_TriggerRates[i]=0;
     for (int j=0; j<nDTBuffSlots; j++){
       m_DeadTimeBuffer[i][j] = -1;
     }
@@ -229,14 +224,29 @@ bool MDetectorEffectsEngineBalloon::Initialize()
   
   // for shield veto: shield pulse duration and card cage delay: constant for now
   m_ShieldThreshold = 80.;
-  m_ShieldPulseDuration = 1.7e-6;
-  m_CCDelay = 700.e-9;
-  m_ShieldDelay = 900.e-9; //this is just a guess based on when veto window occurs!
-  m_ShieldVetoWindowSize = 0.4e-6;
+  m_ShieldPulseDuration = 1.5e-6;  // From measurements this seems to be ~1.5 us (is this energy dependent?)
+  // m_CCDelay = 700.e-9; // Card cage delay, not used now.
+  m_StripDelay = 500e-9;
+  m_StripDeadTime = 1e-6;
+  m_ShieldDelayBefore = 300e-9; // SCB delay before an event is read out
+  m_ShieldDelayAfter = 200e-9; // SCB delay before and after an event
+  m_ShieldDelay = m_ShieldDelayBefore + m_ShieldDelayAfter;
+  m_ShieldVetoWindowSize = 0.4e-6; // Shield veto window size, unchanged from balloon.
+  m_ASICDeadTimePerChannel = 1e-6;
+  activated1 = 0;
+  activated2 = 0;
+  activated3 = 0;
   // for shield veto: gets updated with shield event times
   // start at -10s so that it doesn't veto beginning events by accident
   m_ShieldTime = -10;
-  m_ShieldDeadTime = 0;
+  m_LastGoodHitShieldTime = m_ShieldTime;
+  m_ShieldDeadTime1 = 1.5e-6;
+  m_ShieldDeadTime2 = 1.5e-6;
+  m_ShieldDeadTime3 = 1.5e-6;
+  m_TotalShieldDeadTime1 = 0;
+  m_TotalShieldDeadTime2 = 0;
+  m_TotalShieldDeadTime3 = 0;
+
   
   m_IsShieldDead = false;
   
@@ -275,13 +285,67 @@ bool MDetectorEffectsEngineBalloon::Initialize()
   return true;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+//!Function to define deadtime
+double MDetectorEffectsEngineBalloon::dTimeShields(int detectors_activated){
+  double asic_deadtime = 1e-6;
+  double shield_decayTime = 1.5e-6;
+  double delayTimeBefore = 300e-9;
+  double delayTimeAfter = 200e-9;
+
+  double shields_deadtime = detectors_activated * asic_deadtime;
+  if (shield_decayTime > shields_deadtime) {
+      shields_deadtime += (shield_decayTime - shields_deadtime);
+  }
+  shields_deadtime += delayTimeBefore + delayTimeAfter;
+  return shields_deadtime;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
 
+///////////////////////////////////////////////////////////////////////////////
+
+//! Function to define asic deadtime
+// ** Needs more work **
+// Check if there are neighboring channels. Count the channels only once. The channel map needs to be sorted. 
+// Channels needs to be checked to be within delay time window.
+// double MDetectorEffectsEngineBalloon::dTimeGeDs(vector<int> channels) {
+//     // Enable line is shared for 4 asics per detector, two per side.
+//     // Only called if one channel is activated.
+
+//     double GeD_deadtime = 0;
+//     int temp = 0;
+//     int channelNext = 0;
+//     int highestCountNear = 0;
+//     double waitTime = 400e-9;
+//     double asic_deadtime = 1e-6;
+//     int channels_activated_count = 1;
+//     vector<int>::iterator channels_activated;
+//     // int count_near = 1;
+//     // int channels_activated = channels.size();
+//     sort(channels.begin(), channels.end());
+//     channels_activated = unique(channels.begin(), channels.end());
+//     channels.resize(distance(channels.begin(), channels_activated));
+//     channels_activated_count = channels.size();
+
+//     if (channels_activated_count < 32) {
+//       GeD_deadtime = waitTime + (channels_activated_count*asic_deadtime);
+//     }
+//     else {
+//       GeD_deadtime = waitTime + (channels_activated_count*asic_deadtime)+(asic_deadtime*2);
+//     }
+
+//     return GeD_deadtime;
+// }
+
+///////////////////////////////////////////////////////////////////////////////
+
 //! Analyze whatever needs to be analyzed...
-bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event)
-{
+bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
+
   MSimEvent* SimEvent = nullptr;
   //int RunningID = 0;
   
@@ -289,7 +353,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event)
     
     //cout<<endl<<endl<<"ID: "<<SimEvent->GetID()<<endl;
     
-    // Always update the number of simulated events, since for that nu,ber it doesn't matter if the event passes or not
+    // Always update the number of simulated events, since for that number it doesn't matter if the event passes or not
     m_NumberOfSimulatedEvents = SimEvent->GetSimulationEventID();
     
     
@@ -316,46 +380,198 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event)
     double evt_time = SimEvent->GetTime().GetAsSeconds();
     bool hasDetHits = false;
     bool hasShieldHits = false;
-    bool increaseShieldDeadTime = false;
+    bool increaseShieldDeadTime1 = false;
+    bool increaseShieldDeadTime2 = false;
+    bool increaseShieldDeadTime3 = false;
     
-    // first check if there's another shield hit above the threshold
-    // if so, veto event
+    // // first check if there's another shield hit above the threshold
+    // // if so, veto event
+    // for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){
+    //   MSimHT* HT = SimEvent->GetHTAt(h);
+    //   if (HT->GetDetectorType() == 4) {
+    //     MDVolumeSequence* VS = HT->GetVolumeSequence();
+    //     MDDetector* Detector = VS->GetDetector();
+    //     MString DetName = Detector->GetName();
+        
+    //     //ONLY veto CsI shields, NOT NaI for polarization calibration
+    //     if (DetName.GetSubString(0,6) == "Shield"){
+          
+    //       double energy = HT->GetEnergy();
+    //       energy = NoiseShieldEnergy(energy,DetName);
+    //       HT->SetEnergy(energy);
+          
+    //       if (energy > m_ShieldThreshold) {
+    //         if (m_ShieldTime + m_ShieldVetoWindowSize < evt_time){ hasShieldHits = true; }
+    //         increaseShieldDeadTime = true;
+    //         //this is handling paralyzable dead time
+    //         m_ShieldTime = evt_time;
+    //       }
+    //     }
+    //     else if (HT->GetDetectorType() == 3){ hasDetHits = true; }
+    //   }
+    // }
+
+    // Need to update deadtime for the current detector if there is an another shield that read out an event. 
+    // Shields are paired so that Det 1, 2 are read using 1 ASIC and so forth. This is actually 4 BGOs per ASIC.
+    // This will change in the future when more detectors are added. Need to change the ShieldVetoWindowSize add to something more realistic.
+
     for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){
+      increaseShieldDeadTime1 = false;
+      increaseShieldDeadTime2 = false;
+      increaseShieldDeadTime3 = false;        
       MSimHT* HT = SimEvent->GetHTAt(h);
       if (HT->GetDetectorType() == 4) {
         MDVolumeSequence* VS = HT->GetVolumeSequence();
         MDDetector* Detector = VS->GetDetector();
         MString DetName = Detector->GetName();
-        
-        //ONLY veto CsI shields, NOT NaI for polarization calibration
-        if (DetName.GetSubString(0,6) == "Shield"){
-          
-          double energy = HT->GetEnergy();
-          energy = NoiseShieldEnergy(energy,DetName);
-          HT->SetEnergy(energy);
-          
-          if (energy > m_ShieldThreshold) {
-            if (m_ShieldTime + m_ShieldPulseDuration < evt_time){ hasShieldHits = true; }
-            increaseShieldDeadTime = true;
-            //this is handling paralyzable dead time
-            m_ShieldTime = evt_time;
+      
+        int DetNum = atoi(DetName.GetSubString(6,7));
+        double eng = HT->GetEnergy();
+        switch(DetNum){
+          case 1 :
+            if ((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+              activated1 += 1;
+              increaseShieldDeadTime1 = true;
+              m_ShieldTime = evt_time;
+              hasShieldHits = true;
+            }
+            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 > evt_time)){
+              m_IsShieldDead = true;
+              // activated1 = 1;
+            }
+            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 < evt_time)){
+              m_ShieldDeadTime1 = 1.5e-6;
+              hasShieldHits = true;
+              m_LastGoodHitShieldTime = evt_time;
+              m_ShieldTime = evt_time;
+              activated1 = 1;
+            }
+            break;
+          case 2 :
+            if ((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+              activated1 += 1;
+              increaseShieldDeadTime1 = true;
+              m_ShieldTime = evt_time;
+              hasShieldHits = true;
+            }
+            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 > evt_time)){
+              m_IsShieldDead = true;
+              // activated1 = 1;
+            }
+            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 < evt_time)){
+              m_ShieldDeadTime1 = 1.5e-6;
+              hasShieldHits = true;
+              m_LastGoodHitShieldTime = evt_time;
+              m_ShieldTime = evt_time;
+              activated1 = 1;
+            }
+            break;
+          case 3 :
+            if ((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+              activated2 += 1;
+              increaseShieldDeadTime2 = true;
+              m_ShieldTime = evt_time;
+              hasShieldHits = true;
+            }
+            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 > evt_time)){
+              m_IsShieldDead = true;
+              // activated1 = 1;
+            }
+            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 < evt_time)){
+              m_ShieldDeadTime2 = 1.5e-6;
+              hasShieldHits = true;
+              m_LastGoodHitShieldTime = evt_time;
+              m_ShieldTime = evt_time;
+              activated2 = 1;
+            }
+            break;
+          case 4 :
+            if ((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+              activated2 += 1;
+              increaseShieldDeadTime2 = true;
+              m_ShieldTime = evt_time;
+              hasShieldHits = true;
+
+            }
+            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 > evt_time)){
+              m_IsShieldDead = true;
+              // activated1 = 1;
+            }
+            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 < evt_time)){
+              m_ShieldDeadTime2 = 1.5e-6;
+              hasShieldHits = true;
+              m_LastGoodHitShieldTime = evt_time;
+              m_ShieldTime = evt_time;
+              activated2 = 1;
+            }
+            break;
+          case 5 :
+            if ((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+              activated3 += 1;
+              increaseShieldDeadTime3 = true;
+              m_ShieldTime = evt_time;
+              hasShieldHits = true;
+
+            }
+            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 > evt_time)){
+              m_IsShieldDead = true;
+              // activated1 = 1;
+            }
+            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 < evt_time)){
+              m_ShieldDeadTime3 = 1.5e-6;
+              hasShieldHits = true;
+              m_LastGoodHitShieldTime = evt_time;
+              m_ShieldTime = evt_time;
+              activated3 = 1;
+            }
+            break;
+          case 6 :
+            if ((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+              activated3 += 1;
+              increaseShieldDeadTime3 = true;
+              m_ShieldTime = evt_time;
+              hasShieldHits = true;
+            }
+            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 > evt_time)){
+              m_IsShieldDead = true;
+              // activated1 = 1;
+            }
+            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 < evt_time)){
+              m_ShieldDeadTime3 = 1.5e-6;
+              hasShieldHits = true;
+              m_LastGoodHitShieldTime = evt_time;
+              m_ShieldTime = evt_time;
+              activated3 = 1;
+            }
+            break;
           }
         }
         else if (HT->GetDetectorType() == 3){ hasDetHits = true; }
       }
-    }
+    
     
     if (hasShieldHits == true){ m_NumShieldCounts++; }
-    if (increaseShieldDeadTime == true){ m_ShieldDeadTime += m_ShieldPulseDuration; }
+    if (increaseShieldDeadTime1 == true){ 
+      m_ShieldDeadTime1 = dTimeShields(activated1); 
+      m_TotalShieldDeadTime1 += m_ShieldDeadTime1;
+    }
+    if (increaseShieldDeadTime2 == true){ 
+      m_ShieldDeadTime2 = dTimeShields(activated2); 
+      m_TotalShieldDeadTime2 += m_ShieldDeadTime2;
+    }
+    if (increaseShieldDeadTime3 == true){ 
+      m_ShieldDeadTime3 = dTimeShields(activated3); 
+      m_TotalShieldDeadTime3 += m_ShieldDeadTime3;
+    }
     
     //3 cases to veto events:
     //(1) shield active starts in veto window
     //(2) shield active ends in veto window
     //(3) shield active during the entire veto window
     //this if statement could perhaps be condensed but I'm less confused this way
-    if ((m_ShieldTime + m_ShieldDelay > evt_time + m_CCDelay && m_ShieldTime + m_ShieldDelay < evt_time + m_CCDelay + m_ShieldVetoWindowSize) || 
-      (m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_CCDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_CCDelay + m_ShieldVetoWindowSize) || 
-      (m_ShieldTime + m_ShieldDelay < evt_time + m_CCDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_CCDelay + m_ShieldVetoWindowSize)){
+    if ((m_ShieldTime + m_ShieldDelay > evt_time + m_StripDelay && m_ShieldTime + m_ShieldDelay < evt_time + m_StripDelay + m_ShieldVetoWindowSize) || 
+      (m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_StripDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_StripDelay + m_ShieldVetoWindowSize) || 
+      (m_ShieldTime + m_ShieldDelay < evt_time + m_StripDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_StripDelay + m_ShieldVetoWindowSize)){
       // 		  delete SimEvent;
       //      continue;
       //don't delete the event yet: need to apply dead time to the card cage first!
@@ -616,10 +832,10 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event)
             // We need both to know when we are in the guard ring
             int nStripIDinterim = (int) floor((DriftX + xInDet)*xInvDetectorPitch);
             int pStripIDinterim = (int) floor((DriftY + yInDet)*yInvDetectorPitch);
-            if (nStripIDinterim < 0 || nStripIDinterim > 36 || pStripIDinterim < 0 || pStripIDinterim > 36) {
-              nStripID = 38;
+            if (nStripIDinterim < 0 || nStripIDinterim > 63 || pStripIDinterim < 0 || pStripIDinterim > 63) {
+              nStripID = 65;
             } else {
-              nStripID = 37 - nStripIDinterim; 
+              nStripID = 64 - nStripIDinterim; 
             }
 
             
@@ -635,10 +851,10 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event)
             
             nStripIDinterim = (int) floor((DriftX + xInDet)*xInvDetectorPitch);
             pStripIDinterim = (int) floor((DriftY + yInDet)*yInvDetectorPitch);
-            if (nStripIDinterim < 0 || nStripIDinterim > 36 || pStripIDinterim < 0 || pStripIDinterim > 36) {
-              pStripID = 38;
+            if (nStripIDinterim < 0 || nStripIDinterim > 63 || pStripIDinterim < 0 || pStripIDinterim > 63) {
+              pStripID = 65;
             } else {
-              pStripID = 37 - pStripIDinterim; 
+              pStripID = 64 - pStripIDinterim; 
             }
             
             
@@ -785,17 +1001,48 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event)
         m_TotalHitsCounter++;
         
       }
-      
+    
+    // Check if event if within delay time window and add the channel activated to the channel list. 
+    // Need to group channels by asic and make different channel vectors for each ASIC.
+    // Call dTimeGeDs when all channels are done in one ASIC.
+
+      // for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){     
+      //   MSimHT* HT = SimEvent->GetHTAt(h);
+      //   if (HT->GetDetectorType() == 3) {
+      //     if (evt_time > m_ShieldTime) {}
+      //   }
+      // }
+
+
+      //delete event and update deadtime if the event was vetoed by the shields
+      //can't do this earlier because need to know which detectors got hit
+      // if (m_ShieldVeto){
+      //   for (int i=0; i<nASICs; i++){
+      //     for (int det=0; det<nDets; det++){
+      //       if (detectorsHitForShieldVeto[det] == 1){
+      //       //make sure CC not already dead
+      //         if (evt_time > m_LastHitTimeByDet[det] + m_ASICDeadTime[i]){
+      //           m_ASICDeadTime[i] = 1e-6;
+      //           m_LastHitTimeByDet[det] = evt_time;
+      //           m_TotalDeadTime[det] += m_ASICDeadTime[i];
+      //         }
+      //       }
+      //     }
+      //   }
+      //   delete SimEvent;
+      //   continue;
+      // }
+
       //delete event and update deadtime if the event was vetoed by the shields
       //can't do this earlier because need to know which detectors got hit
       if (m_ShieldVeto){
         for (int det=0; det<nDets; det++){
           if (detectorsHitForShieldVeto[det] == 1){
             //make sure CC not already dead
-            if (evt_time > m_LastHitTimeByDet[det] + m_CCDeadTime[det]){
-              m_CCDeadTime[det] = 1e-5;
+            if (evt_time > m_LastHitTimeByDet[det] + m_ASICDeadTime[det]){
+              m_ASICDeadTime[det] = 1e-6;
               m_LastHitTimeByDet[det] = evt_time;
-              m_TotalDeadTime[det] += m_CCDeadTime[det];
+              m_TotalDeadTime[det] += m_ASICDeadTime[det];
             }
           }
         }
@@ -994,7 +1241,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event)
             double energy2 = (*sh2).m_Energy;
             double depth1 = (*sh1).m_Depth;
             double depth2 = (*sh2).m_Depth;
-            if (side1 && depth1 == depth2) {
+            if (side1 && depth1 == depth2){
 
               //cout<<energy1<<":"<<energy2<<endl;
               vector<double> newEnergies = ApplyChargeLoss(energy1,energy2,detID1,0,depth1,depth2);
@@ -1183,10 +1430,10 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event)
       for (int det=0; det<nDets; det++){
         if (grHit[det] == 1){
           //make sure CC not already dead
-          if (evt_time > m_LastHitTimeByDet[det] + m_CCDeadTime[det]){
-            m_CCDeadTime[det] = 1e-5;
+          if (evt_time > m_LastHitTimeByDet[det] + m_ASICDeadTime[det]){
+            m_ASICDeadTime[det] = 1e-6;
             m_LastHitTimeByDet[det] = evt_time;
-            m_TotalDeadTime[det] += m_CCDeadTime[det];
+            m_TotalDeadTime[det] += m_ASICDeadTime[det];
           }
         }
       }
@@ -1223,10 +1470,10 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event)
       for (int det=0; det<nDets; det++){
         if ((xExists[det] == 0 && yExists[det] == 1) || (xExists[det] == 1 && yExists[det] == 0)){
           //make sure CC not already dead
-          if (evt_time > m_LastHitTimeByDet[det] + m_CCDeadTime[det]){
-            m_CCDeadTime[det] = 1e-5;
+          if (evt_time > m_LastHitTimeByDet[det] + m_ASICDeadTime[det]){
+            m_ASICDeadTime[det] = 1e-6;
             m_LastHitTimeByDet[det] = evt_time;
-            m_TotalDeadTime[det] += m_CCDeadTime[det];
+            m_TotalDeadTime[det] += m_ASICDeadTime[det];
           }
         }
       }
@@ -1262,13 +1509,13 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event)
       
       
       //Step (6.5): Dead time
-      //figure out which detectors are currently dead -- 10us dead time per event
+      //figure out which detectors are currently dead -- deadtime depends on how many channels were activated.
       vector<int> updateLastHitTime = vector<int>(nDets,0);
       vector<int> detIsDead = vector<int>(nDets,0);
       
       for (int d=0; d<nDets; d++){
         //second conditional for running multiple sim files when t starts at 0
-        if (m_LastHitTimeByDet[d] + m_CCDeadTime[d] > evt_time && m_LastHitTimeByDet[d]<evt_time){ detIsDead[d] = 1; }
+        if (m_LastHitTimeByDet[d] + m_ASICDeadTime[d] > evt_time && m_LastHitTimeByDet[d]<evt_time){ detIsDead[d] = 1; }
       }
       
       //erase strip hits in dead detectors
@@ -1289,8 +1536,8 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event)
       for (int d=0; d<nDets; d++){
         if (updateLastHitTime[d] == 1){
           m_LastHitTimeByDet[d] = evt_time;
-          m_CCDeadTime[d] = 1e-5;
-          m_TotalDeadTime[d] += m_CCDeadTime[d];
+          m_ASICDeadTime[d] = 1e-6;
+          m_TotalDeadTime[d] += m_ASICDeadTime[d];
         }
       }
       
@@ -1624,7 +1871,10 @@ bool MDetectorEffectsEngineBalloon::Finalize()
   for (int i=0; i<nDets; i++){
     cout << i << ":\t" << m_TriggerRates[i]/(m_LastTime-m_FirstTime) << endl;
   }
-  cout << "Shield dead time: " << m_ShieldDeadTime << endl;
+  cout << "Total shield dead time for group 1: " << m_TotalShieldDeadTime1 << endl;
+  cout << "Total shield dead time for group 2: " << m_TotalShieldDeadTime2 << endl;
+  cout << "Total shield dead time for group 3: " << m_TotalShieldDeadTime3 << endl;
+  // cout << "Total shield dead time for all shields:" << m_TotalShieldDeadTime << endl;
   
   cout << "Max buffer full index: " << m_MaxBufferFullIndex << '\t' << "Detector " << m_MaxBufferDetector << endl;
   
@@ -1771,6 +2021,7 @@ vector<double> MDetectorEffectsEngineBalloon::ApplyChargeLoss(double energy1, do
   newE2 = energy2 - sumDiff/2.;
   
   m_ChargeLossHist->Fill(trueSum,sumDiff);
+  // vector<double> retEnergy;
   
   retEnergy.push_back(newE1);
   retEnergy.push_back(newE2);
@@ -2186,7 +2437,7 @@ bool MDetectorEffectsEngineBalloon::ParseDeadStripFile()
     
     int det = lineVec.at(0);
     int side = lineVec.at(1);
-    int strip = lineVec.at(2)-1; //in file, strips go from 1-37; in m_DeadStrips they go from 0-36
+    int strip = lineVec.at(2)-1; //in file, strips go from 1-65; in m_DeadStrips they go from 0-63
     lineVec.clear();
     
     //any dead strips have their value in m_DeadStrips set to 1 
