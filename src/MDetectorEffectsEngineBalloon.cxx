@@ -424,126 +424,129 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
         MDVolumeSequence* VS = HT->GetVolumeSequence();
         MDDetector* Detector = VS->GetDetector();
         MString DetName = Detector->GetName();
-      
-        int DetNum = atoi(DetName.GetSubString(6,7));
-        double eng = HT->GetEnergy();
-        switch(DetNum){
-          case 1 :
-            if ((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
-              activated1 += 1;
-              increaseShieldDeadTime1 = true;
-              m_ShieldTime = evt_time;
-              hasShieldHits = true;
-            }
-            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 > evt_time)){
-              m_IsShieldDead = true;
-              // activated1 = 1;
-            }
-            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 < evt_time)){
-              m_ShieldDeadTime1 = 1.5e-6;
-              hasShieldHits = true;
-              m_LastGoodHitShieldTime = evt_time;
-              m_ShieldTime = evt_time;
-              activated1 = 1;
-            }
-            break;
-          case 2 :
-            if ((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
-              activated1 += 1;
-              increaseShieldDeadTime1 = true;
-              m_ShieldTime = evt_time;
-              hasShieldHits = true;
-            }
-            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 > evt_time)){
-              m_IsShieldDead = true;
-              // activated1 = 1;
-            }
-            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 < evt_time)){
-              m_ShieldDeadTime1 = 1.5e-6;
-              hasShieldHits = true;
-              m_LastGoodHitShieldTime = evt_time;
-              m_ShieldTime = evt_time;
-              activated1 = 1;
-            }
-            break;
-          case 3 :
-            if ((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
-              activated2 += 1;
-              increaseShieldDeadTime2 = true;
-              m_ShieldTime = evt_time;
-              hasShieldHits = true;
-            }
-            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 > evt_time)){
-              m_IsShieldDead = true;
-              // activated1 = 1;
-            }
-            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 < evt_time)){
-              m_ShieldDeadTime2 = 1.5e-6;
-              hasShieldHits = true;
-              m_LastGoodHitShieldTime = evt_time;
-              m_ShieldTime = evt_time;
-              activated2 = 1;
-            }
-            break;
-          case 4 :
-            if ((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
-              activated2 += 1;
-              increaseShieldDeadTime2 = true;
-              m_ShieldTime = evt_time;
-              hasShieldHits = true;
+        if (DetName.GetSubString(0,6) == "Shield"){
+          int DetNum = atoi(DetName.GetSubString(6,7));
+          double energy = HT->GetEnergy();
+          energy = NoiseShieldEnergy(energy,DetName);
+          HT->SetEnergy(energy);
+          switch(DetNum){
+            case 1 :
+              if ((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+                activated1 += 1;
+                increaseShieldDeadTime1 = true;
+                m_ShieldTime = evt_time;
+                hasShieldHits = true;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 > evt_time)){
+                m_IsShieldDead = true;
+                // activated1 = 1;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 < evt_time)){
+                m_ShieldDeadTime1 = 1.5e-6;
+                hasShieldHits = true;
+                m_LastGoodHitShieldTime = evt_time;
+                m_ShieldTime = evt_time;
+                activated1 = 1;
+              }
+              break;
+            case 2 :
+              if ((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+                activated1 += 1;
+                increaseShieldDeadTime1 = true;
+                m_ShieldTime = evt_time;
+                hasShieldHits = true;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 > evt_time)){
+                m_IsShieldDead = true;
+                // activated1 = 1;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 < evt_time)){
+                m_ShieldDeadTime1 = 1.5e-6;
+                hasShieldHits = true;
+                m_LastGoodHitShieldTime = evt_time;
+                m_ShieldTime = evt_time;
+                activated1 = 1;
+              }
+              break;
+            case 3 :
+              if ((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+                activated2 += 1;
+                increaseShieldDeadTime2 = true;
+                m_ShieldTime = evt_time;
+                hasShieldHits = true;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 > evt_time)){
+                m_IsShieldDead = true;
+                // activated1 = 1;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 < evt_time)){
+                m_ShieldDeadTime2 = 1.5e-6;
+                hasShieldHits = true;
+                m_LastGoodHitShieldTime = evt_time;
+                m_ShieldTime = evt_time;
+                activated2 = 1;
+              }
+              break;
+            case 4 :
+              if ((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+                activated2 += 1;
+                increaseShieldDeadTime2 = true;
+                m_ShieldTime = evt_time;
+                hasShieldHits = true;
 
-            }
-            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 > evt_time)){
-              m_IsShieldDead = true;
-              // activated1 = 1;
-            }
-            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 < evt_time)){
-              m_ShieldDeadTime2 = 1.5e-6;
-              hasShieldHits = true;
-              m_LastGoodHitShieldTime = evt_time;
-              m_ShieldTime = evt_time;
-              activated2 = 1;
-            }
-            break;
-          case 5 :
-            if ((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
-              activated3 += 1;
-              increaseShieldDeadTime3 = true;
-              m_ShieldTime = evt_time;
-              hasShieldHits = true;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 > evt_time)){
+                m_IsShieldDead = true;
+                // activated1 = 1;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 < evt_time)){
+                m_ShieldDeadTime2 = 1.5e-6;
+                hasShieldHits = true;
+                m_LastGoodHitShieldTime = evt_time;
+                m_ShieldTime = evt_time;
+                activated2 = 1;
+              }
+              break;
+            case 5 :
+              if ((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+                activated3 += 1;
+                increaseShieldDeadTime3 = true;
+                m_ShieldTime = evt_time;
+                hasShieldHits = true;
 
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 > evt_time)){
+                m_IsShieldDead = true;
+                // activated1 = 1;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 < evt_time)){
+                m_ShieldDeadTime3 = 1.5e-6;
+                hasShieldHits = true;
+                m_LastGoodHitShieldTime = evt_time;
+                m_ShieldTime = evt_time;
+                activated3 = 1;
+              }
+              break;
+            case 6 :
+              if ((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+                activated3 += 1;
+                increaseShieldDeadTime3 = true;
+                m_ShieldTime = evt_time;
+                hasShieldHits = true;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 > evt_time)){
+                m_IsShieldDead = true;
+                // activated1 = 1;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 < evt_time)){
+                m_ShieldDeadTime3 = 1.5e-6;
+                hasShieldHits = true;
+                m_LastGoodHitShieldTime = evt_time;
+                m_ShieldTime = evt_time;
+                activated3 = 1;
+              }
+              break;
             }
-            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 > evt_time)){
-              m_IsShieldDead = true;
-              // activated1 = 1;
-            }
-            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 < evt_time)){
-              m_ShieldDeadTime3 = 1.5e-6;
-              hasShieldHits = true;
-              m_LastGoodHitShieldTime = evt_time;
-              m_ShieldTime = evt_time;
-              activated3 = 1;
-            }
-            break;
-          case 6 :
-            if ((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
-              activated3 += 1;
-              increaseShieldDeadTime3 = true;
-              m_ShieldTime = evt_time;
-              hasShieldHits = true;
-            }
-            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 > evt_time)){
-              m_IsShieldDead = true;
-              // activated1 = 1;
-            }
-            else if((eng > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 < evt_time)){
-              m_ShieldDeadTime3 = 1.5e-6;
-              hasShieldHits = true;
-              m_LastGoodHitShieldTime = evt_time;
-              m_ShieldTime = evt_time;
-              activated3 = 1;
-            }
-            break;
           }
         }
         else if (HT->GetDetectorType() == 3){ hasDetHits = true; }
@@ -832,10 +835,10 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
             // We need both to know when we are in the guard ring
             int nStripIDinterim = (int) floor((DriftX + xInDet)*xInvDetectorPitch);
             int pStripIDinterim = (int) floor((DriftY + yInDet)*yInvDetectorPitch);
-            if (nStripIDinterim < 0 || nStripIDinterim > 63 || pStripIDinterim < 0 || pStripIDinterim > 63) {
-              nStripID = 65;
+            if (nStripIDinterim < 0 || nStripIDinterim > 36 || pStripIDinterim < 0 || pStripIDinterim > 36) {
+              nStripID = 38;
             } else {
-              nStripID = 64 - nStripIDinterim; 
+              nStripID = 37 - nStripIDinterim; 
             }
 
             
@@ -851,10 +854,10 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
             
             nStripIDinterim = (int) floor((DriftX + xInDet)*xInvDetectorPitch);
             pStripIDinterim = (int) floor((DriftY + yInDet)*yInvDetectorPitch);
-            if (nStripIDinterim < 0 || nStripIDinterim > 63 || pStripIDinterim < 0 || pStripIDinterim > 63) {
-              pStripID = 65;
+            if (nStripIDinterim < 0 || nStripIDinterim > 36 || pStripIDinterim < 0 || pStripIDinterim > 36) {
+              pStripID = 38;
             } else {
-              pStripID = 64 - pStripIDinterim; 
+              pStripID = 37 - pStripIDinterim; 
             }
             
             
