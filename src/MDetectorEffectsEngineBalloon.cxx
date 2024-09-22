@@ -383,6 +383,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
     bool increaseShieldDeadTime1 = false;
     bool increaseShieldDeadTime2 = false;
     bool increaseShieldDeadTime3 = false;
+    m_IsShieldDead = false;
     
     // // first check if there's another shield hit above the threshold
     // // if so, veto event
@@ -414,7 +415,6 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
     // Need to update deadtime for the current detector if there is an another shield that read out an event. 
     // Shields are paired so that Det 1, 2 are read using 1 ASIC and so forth. This is actually 4 BGOs per ASIC.
     // This will change in the future when more detectors are added. Need to change the ShieldVetoWindowSize add to something more realistic.
-
     for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){
       increaseShieldDeadTime1 = false;
       increaseShieldDeadTime2 = false;
@@ -572,15 +572,19 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
     //(2) shield active ends in veto window
     //(3) shield active during the entire veto window
     //this if statement could perhaps be condensed but I'm less confused this way
-    if ((m_ShieldTime + m_ShieldDelay > evt_time + m_StripDelay && m_ShieldTime + m_ShieldDelay < evt_time + m_StripDelay + m_ShieldVetoWindowSize) || 
-      (m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_StripDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_StripDelay + m_ShieldVetoWindowSize) || 
-      (m_ShieldTime + m_ShieldDelay < evt_time + m_StripDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_StripDelay + m_ShieldVetoWindowSize)){
-      // 		  delete SimEvent;
-      //      continue;
-      //don't delete the event yet: need to apply dead time to the card cage first!
+    // if ((m_ShieldTime + m_ShieldDelay > evt_time + m_StripDelay && m_ShieldTime + m_ShieldDelay < evt_time + m_StripDelay + m_ShieldVetoWindowSize) || 
+    //   (m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_StripDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_StripDelay + m_ShieldVetoWindowSize) || 
+    //   (m_ShieldTime + m_ShieldDelay < evt_time + m_StripDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_StripDelay + m_ShieldVetoWindowSize)){
+    //   // 		  delete SimEvent;
+    //   //      continue;
+    //   //don't delete the event yet: need to apply dead time to the card cage first!
+    //   m_ShieldVeto = true;
+    //   }
+    //   else { m_ShieldVeto = false; }
+    if (m_IsShieldDead) {
       m_ShieldVeto = true;
-      }
-      else { m_ShieldVeto = false; }
+    }
+    else {m_ShieldVeto = false;}
       
       //get interactions to look for ionization in hits
       vector<MSimIA*> IAs;
