@@ -252,11 +252,11 @@ private:
  
 	//COSI constants
 	//! number of detectors
-	static const int nDets = 16;
+	static const int nDets = 12;
 	//! number of sides
 	static const int nSides = 2;
 	//! number of strips
-	static const int nStrips = 32;
+	static const int nStrips = 37;
 	//! slots in DSP dead time buffer
 	static const int nDTBuffSlots = 16;
  

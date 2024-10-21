@@ -436,6 +436,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
                 increaseShieldDeadTime1 = true;
                 m_ShieldTime = evt_time;
                 hasShieldHits = true;
+                m_IsShieldDead = false;
               }
               else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 > evt_time)){
                 m_IsShieldDead = true;
@@ -447,6 +448,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
                 m_LastGoodHitShieldTime = evt_time;
                 m_ShieldTime = evt_time;
                 activated1 = 1;
+                m_IsShieldDead = false;
               }
               break;
             case 2 :
@@ -455,6 +457,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
                 increaseShieldDeadTime1 = true;
                 m_ShieldTime = evt_time;
                 hasShieldHits = true;
+                m_IsShieldDead = false;
               }
               else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 > evt_time)){
                 m_IsShieldDead = true;
@@ -466,6 +469,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
                 m_LastGoodHitShieldTime = evt_time;
                 m_ShieldTime = evt_time;
                 activated1 = 1;
+                m_IsShieldDead = false;
               }
               break;
             case 3 :
@@ -474,6 +478,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
                 increaseShieldDeadTime2 = true;
                 m_ShieldTime = evt_time;
                 hasShieldHits = true;
+                m_IsShieldDead = false;
               }
               else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 > evt_time)){
                 m_IsShieldDead = true;
@@ -485,6 +490,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
                 m_LastGoodHitShieldTime = evt_time;
                 m_ShieldTime = evt_time;
                 activated2 = 1;
+                m_IsShieldDead = false;
               }
               break;
             case 4 :
@@ -493,6 +499,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
                 increaseShieldDeadTime2 = true;
                 m_ShieldTime = evt_time;
                 hasShieldHits = true;
+                m_IsShieldDead = false;
 
               }
               else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 > evt_time)){
@@ -505,6 +512,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
                 m_LastGoodHitShieldTime = evt_time;
                 m_ShieldTime = evt_time;
                 activated2 = 1;
+                m_IsShieldDead = false;
               }
               break;
             case 5 :
@@ -513,6 +521,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
                 increaseShieldDeadTime3 = true;
                 m_ShieldTime = evt_time;
                 hasShieldHits = true;
+                m_IsShieldDead = false;
 
               }
               else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 > evt_time)){
@@ -525,6 +534,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
                 m_LastGoodHitShieldTime = evt_time;
                 m_ShieldTime = evt_time;
                 activated3 = 1;
+                m_IsShieldDead = false;
               }
               break;
             case 6 :
@@ -533,6 +543,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
                 increaseShieldDeadTime3 = true;
                 m_ShieldTime = evt_time;
                 hasShieldHits = true;
+                m_IsShieldDead = false;
               }
               else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 > evt_time)){
                 m_IsShieldDead = true;
@@ -544,6 +555,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
                 m_LastGoodHitShieldTime = evt_time;
                 m_ShieldTime = evt_time;
                 activated3 = 1;
+                m_IsShieldDead = false;
               }
               break;
             }

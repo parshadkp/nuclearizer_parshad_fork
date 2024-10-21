@@ -32,7 +32,7 @@
 #include "TGClient.h"
 
 // MEGAlib libs:
-#include "MGUIOptionsLoaderSimulations.h"
+#include "MGUIOptionsLoaderSimulationsBalloon.h"
 #include "MModuleEventSaver.h"
 
 
