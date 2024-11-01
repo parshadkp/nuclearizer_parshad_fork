@@ -815,6 +815,7 @@ bool MDetectorEffectsEngineBalloon::GetNextEvent(MReadOutAssembly* Event) {
           
           double factorN = m_ChargeSharingFactors[DetectorID][0]->Eval(energyDeposited);
           double factorP = m_ChargeSharingFactors[DetectorID][1]->Eval(energyDeposited);
+          cout << "factorN: " << factorN << "factorP: " << factorP << endl;
           //				double factorN = 1;
           //				double factorP = 1;
           
