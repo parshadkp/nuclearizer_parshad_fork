@@ -486,11 +486,11 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       MDDetector* Detector = VS->GetDetector();
       MString DetectorName = Detector->GetName();
       // cout << "DetectorName = " << DetectorName << endl;
-      if(!DetectorName.BeginsWith("Q0D")){
+      if(!DetectorName.BeginsWith("D")){
         continue; //probably a shield hit.  this can happen if the veto flag is off for the shields
       }
       // Sets the detector ID for different hits. May need to change if there is a change in naming convention
-      DetectorName.RemoveAllInPlace("Q0D");
+      DetectorName.RemoveAllInPlace("D");
       int DetectorID = DetectorName.ToInt();
       
       
@@ -1722,7 +1722,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       SH->IsXStrip(Hit.m_ROE.IsLowVoltageStrip());
       // cout << "setting ADC units: " << Hit.m_ADC << endl;
       SH->SetADCUnits(Hit.m_ADC);
-      SH->SetTiming(Hit.m_Timing);
+      // SH->SetTiming(Hit.m_Timing);
       SH->SetTAC(Hit.m_TAC);
       // cout << Hit.m_Timing << endl;
       SH->SetPreampTemp(20);
