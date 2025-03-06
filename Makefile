@@ -116,6 +116,15 @@ $(LB)/MModuleDiagnostics.o \
 $(LB)/MModuleDiagnosticsEnergyPerStrip.o \
 $(LB)/MGUIExpoDiagnosticsEnergyPerStrip.o \
 $(LB)/MGUIExpoDiagnostics.o \
+<<<<<<< Updated upstream
+=======
+$(LB)/MDetectorEffectsEngineSingleDet.o \
+$(LB)/MModuleLoaderSimulationsSingleDet.o \
+$(LB)/MModuleTACcut.o \
+$(LB)/MGUIExpoTACcut.o \
+$(LB)/MGUIOptionsTACcut.o \
+
+>>>>>>> Stashed changes
 
 
 

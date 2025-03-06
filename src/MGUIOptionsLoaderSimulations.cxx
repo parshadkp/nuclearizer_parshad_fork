@@ -114,6 +114,11 @@ void MGUIOptionsLoaderSimulations::Create()
   m_DepthCalibrationCoeffsFileSelector->SetFileType("Coefficients file", "*.txt");
   m_OptionsFrame->AddFrame(m_DepthCalibrationCoeffsFileSelector, LabelLayout);
 
+  m_DepthCalibrationTACCalFileSelector = new MGUIEFileSelector(m_OptionsFrame, "Please select a TAC calibration parameters file:",
+    dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->GetDepthCalibrationTACCalFileName());
+  m_DepthCalibrationTACCalFileSelector->SetFileType("TAC calibration file", "*.csv");
+  m_OptionsFrame->AddFrame(m_DepthCalibrationTACCalFileSelector, LabelLayout);
+
   m_DepthCalibrationSplinesFileSelector = new MGUIEFileSelector(m_OptionsFrame, "Please select a depth calibration splines file:",
     dynamic_cast<MModuleLoaderSimulationsBalloon*>(m_Module)->GetDepthCalibrationSplinesFileName());
   m_DepthCalibrationSplinesFileSelector->SetFileType("Splines file", "*.ctd");
@@ -186,6 +191,7 @@ bool MGUIOptionsLoaderSimulations::OnApply()
 {
   // Modify this to store the data in the module!
 
+<<<<<<< Updated upstream
   dynamic_cast<MModuleLoaderSimulationsBalloon*>(m_Module)->SetSimulationFileName(m_SimulationFileSelector->GetFileName());
   dynamic_cast<MModuleLoaderSimulationsBalloon*>(m_Module)->SetEnergyCalibrationFileName(m_EnergyCalibrationFileSelector->GetFileName());
   dynamic_cast<MModuleLoaderSimulationsBalloon*>(m_Module)->SetThresholdFileName(m_ThresholdFileSelector->GetFileName());
@@ -199,6 +205,23 @@ bool MGUIOptionsLoaderSimulations::OnApply()
   dynamic_cast<MModuleLoaderSimulationsBalloon*>(m_Module)->SetApplyFudgeFactor(m_ApplyFudgeFactorSelector->IsOn());
   dynamic_cast<MModuleLoaderSimulationsBalloon*>(m_Module)->SetUseStopAfter(m_StopAfter->IsOn());
   dynamic_cast<MModuleLoaderSimulationsBalloon*>(m_Module)->SetMaximumAcceptedEvents(m_MaximumAcceptedEvents->GetAsInt());
+=======
+  dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetSimulationFileName(m_SimulationFileSelector->GetFileName());
+  dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetDeadtimeFileName(m_DeadtimeFileSelector->GetFileName());
+  dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetEnergyCalibrationFileName(m_EnergyCalibrationFileSelector->GetFileName());
+  dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetThresholdFileName(m_ThresholdFileSelector->GetFileName());
+	dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetGuardRingThresholdFileName(m_GuardRingThresholdFileSelector->GetFileName());
+	dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetChargeSharingFileName(m_ChargeSharingFileSelector->GetFileName());
+	dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetCrosstalkFileName(m_CrosstalkFileSelector->GetFileName());
+	dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetChargeLossFileName(m_ChargeLossFileSelector->GetFileName());
+  dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetDeadStripFileName(m_DeadStripFileSelector->GetFileName());
+  dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetDepthCalibrationCoeffsFileName(m_DepthCalibrationCoeffsFileSelector->GetFileName());
+  dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetDepthCalibrationTACCalFileName(m_DepthCalibrationTACCalFileSelector->GetFileName());
+  dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetDepthCalibrationSplinesFileName(m_DepthCalibrationSplinesFileSelector->GetFileName());
+  dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetApplyFudgeFactor(m_ApplyFudgeFactorSelector->IsOn());
+  dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetUseStopAfter(m_StopAfter->IsOn());
+  dynamic_cast<MModuleLoaderSimulationsSingleDet*>(m_Module)->SetMaximumAcceptedEvents(m_MaximumAcceptedEvents->GetAsInt());
+>>>>>>> Stashed changes
   
   return true;
 }
