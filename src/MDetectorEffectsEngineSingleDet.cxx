@@ -491,7 +491,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       }
       // Sets the detector ID for different hits. May need to change if there is a change in naming convention
       DetectorName.RemoveAllInPlace("D");
-      int DetectorID = DetectorName.ToInt();
+      int DetectorID = DetectorName.ToInt()-1;
       
       
       MDEEStripHit pSide; // Low voltage
