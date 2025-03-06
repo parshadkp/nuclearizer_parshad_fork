@@ -53,9 +53,14 @@ public:
   void SetSimulationFileName(const MString& FileName) { m_SimulationFileName = FileName; }
   //! Set the deadtime constants file name
   void SetDeadtimeFileName(const MString& FileName) { m_DeadtimeFileName = FileName; }
+  //! Set the TAC calibration file name
+  void SetDepthCalibrationTACCalFileName(const MString& FileName) { m_DepthCalibrationTACCalFileName = FileName; }
   //! Get the simulation file name 
   MString GetSimulationFileName() const { return m_SimulationFileName; }
+  //! Get the deadtime parameters file name
   MString GetDeadtimeFileName() const { return m_DeadtimeFileName; }
+  //! Get the TAC calibration parameters file name
+  MString GetDepthCalibrationTACCalFileName() const { return m_DepthCalibrationTACCalFileName; }
   
   //! Show the progress of simulation file reading
   void ShowProgressBar(bool Flag) { m_ShowProgressBar = Flag; }
@@ -165,7 +170,7 @@ public:
   {
   public:
     //! Default constructor
-    MDEEStripHit() : m_ADC(0), m_Timing(0), m_PreampTemp(0), m_Energy(0), m_EnergyOrig(0), m_HitIndex(0), m_IsGuardRing(false), m_ID(0), m_OppositeStrip(0), m_Depth(-10) {}
+    MDEEStripHit() : m_ADC(0), m_Timing(0), m_TAC(0), m_PreampTemp(0), m_Energy(0), m_EnergyOrig(0), m_HitIndex(0), m_IsGuardRing(false), m_ID(0), m_OppositeStrip(0), m_Depth(-10) {}
   
     //! The read-out element
     MReadOutElementDoubleStrip m_ROE;
@@ -173,6 +178,8 @@ public:
     double m_ADC;
     //! The timing value;
     double m_Timing;
+    //! The TAC value;
+    double m_TAC;
     //! The pre-amp temperature value;
     double m_PreampTemp;
     
@@ -220,6 +227,8 @@ protected:
   MString m_SimulationFileName;
   //! Deadtime constants
   MString m_DeadtimeFileName;
+  //! TAC calibration constants
+  MString m_DepthCalibrationTACCalFileName;
   //! The file reader
   MFileEventsSim* m_Reader;
   
@@ -270,8 +279,10 @@ private:
   static const int nASICs = 4;
   //! number of BGO Detectors
 	static const int nShieldDets = 22;
+  // static const int nShieldDets = 1;
   //! number of BGO Panels
   static const int nShieldPanels = 6; 
+  // static const int nShieldPanels = 1; 
 	//! slots in DSP dead time buffer
 	static const int nDTBuffSlots = 16;
 
@@ -399,13 +410,16 @@ private:
   vector<vector<int> >m_ShieldHitID = vector<vector<int> >(nShieldPanels);
   //! Group of shield numers per panel
 	vector<vector<int> > m_ShieldPanelGroups = {
-    {1, 2, 3, 4},
-    {5, 6, 7, 8},
-    {9, 10, 11, 12},
-    {13, 14, 15, 16},
-    {17, 18, 19},
-    {20, 21, 22}
+    {0, 1, 2, 3},
+    {4, 5, 6, 7},
+    {8, 9, 10, 11},
+    {12, 13, 14, 15},
+    {16, 17, 18},
+    {19, 20, 21}
   };
+  // vector<vector<int> > m_ShieldPanelGroups = {
+  //   {0}
+  // };
 
   
   long m_NumShieldCounts;

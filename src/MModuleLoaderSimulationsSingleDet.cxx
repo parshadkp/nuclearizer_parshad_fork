@@ -220,6 +220,10 @@ bool MModuleLoaderSimulationsSingleDet::ReadXmlConfiguration(MXmlNode* Node)
   if (DepthCalibrationCoeffsFileNameNode != 0) {
     SetDepthCalibrationCoeffsFileName(DepthCalibrationCoeffsFileNameNode->GetValue());
   }
+  MXmlNode* DepthCalibrationTACCalFileNameNode = Node->GetNode("DepthCalibrationTACCalFileName");
+  if (DepthCalibrationTACCalFileNameNode != 0) {
+    SetDepthCalibrationTACCalFileName(DepthCalibrationTACCalFileNameNode->GetValue());
+  }
   MXmlNode* DepthCalibrationSplinesFileNameNode = Node->GetNode("DepthCalibrationSplinesFileName");
   if (DepthCalibrationSplinesFileNameNode != 0) {
     SetDepthCalibrationSplinesFileName(DepthCalibrationSplinesFileNameNode->GetValue());
@@ -259,6 +263,7 @@ MXmlNode* MModuleLoaderSimulationsSingleDet::CreateXmlConfiguration()
 	new MXmlNode(Node, "CrosstalkFileName", m_CrosstalkFileName);
 	new MXmlNode(Node, "ChargeLossFileName", m_ChargeLossFileName);
   new MXmlNode(Node, "DepthCalibrationCoeffsFileName", m_DepthCalibrationCoeffsFileName);
+  new MXmlNode(Node, "DepthCalibrationTACCalFileName", m_DepthCalibrationTACCalFileName);
   new MXmlNode(Node, "DepthCalibrationSplinesFileName", m_DepthCalibrationSplinesFileName);
   new MXmlNode(Node, "ApplyFudgeFactor", m_ApplyFudgeFactor);
   new MXmlNode(Node, "UseStopAfter", m_UseStopAfter);

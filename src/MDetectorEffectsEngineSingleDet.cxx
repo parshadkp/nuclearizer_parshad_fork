@@ -156,6 +156,11 @@ bool MDetectorEffectsEngineSingleDet::Initialize()
     cout << "Unable to load depth calibration coefficients file - Aborting!" << endl;
     return false;
   }
+
+  if( m_DepthCalibrator->LoadTACCalFile(m_DepthCalibrationTACCalFileName) == false){
+    cout << "Unable to load TAC calibration file - Aborting!" << endl;
+    return false;
+  }
   
   if( m_DepthCalibrator->LoadSplinesFile(m_DepthCalibrationSplinesFileName) == false ){
     cout << "Unable to load depth calibration splines file - Aborting!" << endl;
@@ -381,21 +386,35 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     m_ShieldVeto = false;
  
     m_IsShieldDead = false;
-    // This is where shield veto code will go ...
+
+    // // This is where shield veto code will go ...
     for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){
       MSimHT* HT = SimEvent->GetHTAt(h);
+
+      // MDVolumeSequence* VS = HT->GetVolumeSequence();
+      // MDDetector* Detector = VS->GetDetector();
+      // MString DetName = Detector->GetName();
+      // // cout << DetName << ": " << HT->GetDetectorType() << endl;
+      // if (DetName == "BGO_Coinc_sideX_neg_1") {
+      //   cout << HT->GetDetectorType() << endl;
+      // }
+      
       if (HT->GetDetectorType() == 8) {
         MDVolumeSequence* VS = HT->GetVolumeSequence();
         MDDetector* Detector = VS->GetDetector();
         MString DetName = Detector->GetName();
 
-        ShieldDetNum = atoi(DetName.GetSubString(6,7));
+        DetName.RemoveAllInPlace("BGO_Coinc_sideX_neg_");
+        ShieldDetNum = DetName.ToInt();
+        ShieldDetNum = ShieldDetNum - 1;
         energy = HT->GetEnergy();
-        ShieldDetGroup = 0;
+        ShieldDetGroup = 0; // Detector panel with the hit
         energy = NoiseShieldEnergy(energy,DetName);
         HT->SetEnergy(energy);
 
-        if (DetName.GetSubString(0,6) == "Shield" && (energy > m_ShieldThreshold)){ //"Shield" needs to change
+        cout << "Shield Hit Det Num: " << ShieldDetNum << endl;
+
+        if ((energy > m_ShieldThreshold)){ //"Shield" needs to change; In Carolyn's mass model this is BGO_Coinc_sideX_neg. Need to find a better naming scheme.
 
           bool found = false;
 
@@ -478,12 +497,13 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       MDVolumeSequence* VS = HT->GetVolumeSequence();
       MDDetector* Detector = VS->GetDetector();
       MString DetectorName = Detector->GetName();
-      if(!DetectorName.BeginsWith("D")){
+      // cout << "DetectorName = " << DetectorName << endl;
+      if(!DetectorName.BeginsWith("Q0D")){
         continue; //probably a shield hit.  this can happen if the veto flag is off for the shields
       }
       // Sets the detector ID for different hits. May need to change if there is a change in naming convention
-      DetectorName.RemoveAllInPlace("D");
-      int DetectorID = DetectorName.ToInt()-1;
+      DetectorName.RemoveAllInPlace("Q0D");
+      int DetectorID = DetectorName.ToInt();
       
       
       MDEEStripHit pSide; // Low voltage
@@ -526,7 +546,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
 // This needs to be implemented once the depth calibration is implemented
       //SetStripID needs to be called before we can look up the depth calibration coefficients
       int PixelCode = DetectorID*10000 + pSide.m_ROE.GetStripID()*100 + nSide.m_ROE.GetStripID();
-      std::vector<double>* Coeffs = m_DepthCalibrator->GetPixelCoeffs(PixelCode);
+      vector<double>* Coeffs = m_DepthCalibrator->GetPixelCoeffs(PixelCode);
       if( Coeffs == NULL ){
         //pixel is not calibrated! discard this event....
         // cout << "pixel " << PixelCode << " has no depth calibration... discarding event" << endl;
@@ -1037,7 +1057,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     
 
     
-    // Step (2): Calculate and noise timing
+    // Step (2): Calculate and noise timing. Need to update this to noise TAC values instead.
     const double TimingNoise = 3.76; //ns//I have been assuming 12.5 ns FWHM on the CTD... so the 1 sigma error on the timing value should be (12.5/2.35)/sqrt(2)
     for (MDEEStripHit& Hit: MergedStripHits) {
       
@@ -1050,7 +1070,17 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       }
       LowestNoisedTiming -= fmod(LowestNoisedTiming,5.0); //round down to nearest multiple of 5
       Hit.m_Timing = LowestNoisedTiming;
-      // cout << Hit.m_Timing << endl;
+      
+      // Nanoseconds to TAC conversion coeffs. Should check if the p to LV correlation is correct.
+      if (Hit.m_ROE.IsLowVoltageStrip()) {
+        vector<double>* LVTACCalCoeffs = m_DepthCalibrator->GetLVTACCal(Hit.m_ROE.GetDetectorID(), Hit.m_ROE.GetStripID());
+        Hit.m_TAC = (Hit.m_Timing - LVTACCalCoeffs->at(1))/LVTACCalCoeffs->at(0);
+      }
+      else if (!Hit.m_ROE.IsLowVoltageStrip()) {
+        vector<double>* HVTACCalCoeffs = m_DepthCalibrator->GetHVTACCal(Hit.m_ROE.GetDetectorID(), Hit.m_ROE.GetStripID());
+        Hit.m_TAC = (Hit.m_Timing - HVTACCalCoeffs->at(1))/HVTACCalCoeffs->at(0);
+      }
+      // cout << "TAC value of hit: " << Hit.m_TAC << endl;
     }
     
     // Step (3): Calculate and noise ADC values including cross talk, charge loss, charge sharing, ADC overflow!
@@ -1705,6 +1735,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       // cout << "setting ADC units: " << Hit.m_ADC << endl;
       SH->SetADCUnits(Hit.m_ADC);
       SH->SetTiming(Hit.m_Timing);
+      SH->SetTAC(Hit.m_TAC);
       // cout << Hit.m_Timing << endl;
       SH->SetPreampTemp(20);
       vector<int> O;
@@ -1926,7 +1957,7 @@ double MDetectorEffectsEngineSingleDet::NoiseShieldEnergy(double energy, MString
   
   vector<double> resolution_consts{3.75,3.74,18.47,4.23,3.07,3.98};
   
-  shield_name.RemoveAllInPlace("Shield");
+  shield_name.RemoveAllInPlace("BGO_Coinc_sideX_neg_");
   int shield_num = shield_name.ToInt();
   shield_num = shield_num - 1;
   double res_constant = resolution_consts[shield_num];

@@ -89,6 +89,8 @@ class MGUIOptionsLoaderSimulations : public MGUIOptions
 	MGUIEFileSelector* m_ChargeLossFileSelector;
   //! Depth calibration coefficients file name
   MGUIEFileSelector* m_DepthCalibrationCoeffsFileSelector;
+  //! TAC calibration file name
+  MGUIEFileSelector* m_DepthCalibrationTACCalFileSelector;
   //! Depth calibration splines file name
   MGUIEFileSelector* m_DepthCalibrationSplinesFileSelector;
 	//! Apply fudge factor
