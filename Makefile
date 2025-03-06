@@ -118,6 +118,10 @@ $(LB)/MGUIExpoDiagnosticsEnergyPerStrip.o \
 $(LB)/MGUIExpoDiagnostics.o \
 $(LB)/MDetectorEffectsEngineSingleDet.o \
 $(LB)/MModuleLoaderSimulationsSingleDet.o \
+$(LB)/MModuleTACcut.o \
+$(LB)/MGUIExpoTACcut.o \
+$(LB)/MGUIOptionsTACcut.o \
+
 
 
 

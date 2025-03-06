@@ -1,5 +1,5 @@
 /*
- * MGUIExpoDepthCalibration.h
+ * MGUIExpoTACcut.h
  *    
  * Copyright (C) by Andreas Zoglauer.
  * All rights reserved.
@@ -9,8 +9,8 @@
  */
 
 
-#ifndef __MGUIExpoDepthCalibration2024__
-#define __MGUIExpoDepthCalibration2024__
+#ifndef __MGUIExpoTACcut__
+#define __MGUIExpoTACcut__
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -36,24 +36,20 @@
 // NuSTAR libs
 #include "MGUIExpo.h"
 
-// Standard libs
-#include <unordered_map>
-using namespace std;
-
 // Forward declarations:
 
 
 ////////////////////////////////////////////////////////////////////////////////
 
 
-class MGUIExpoDepthCalibration2024 : public MGUIExpo
+class MGUIExpoTACcut : public MGUIExpo
 {
   // public Session:
  public:
   //! Default constructor
-  MGUIExpoDepthCalibration2024(MModule* Module);
+  MGUIExpoTACcut(MModule* Module);
   //! Default destructor
-  virtual ~MGUIExpoDepthCalibration2024();
+  virtual ~MGUIExpoTACcut();
 
   //! The creation part which gets overwritten
   virtual void Create();
@@ -67,23 +63,23 @@ class MGUIExpoDepthCalibration2024 : public MGUIExpo
   //! Export the data in the UI
   virtual void Export(const MString& FileName);
 
-  //! Set the arrangment of the depth histogram
+  //! Set the arrangment of the TAC histogram
   //!  0    1    2    3 
   //!  4    5    6    7
   //!  8    9   10   11
-  void SetDepthHistogramArrangement(vector<unsigned int>* DetIDs);
+  void SetTACHistogramArrangement(const vector<unsigned int> DetIDs);
   
   //! Set the energy histogram parameters 
-  void SetDepthHistogramParameters(unsigned int DetID, unsigned int NBins, double DepthMin, double DepthMax);
+  void SetTACHistogramParameters(unsigned int DetID, unsigned int NBins, double TACMin, double TACMax);
   
   //! Set the energy histogram parameters 
-  void SetDepthHistogramName(unsigned int DetID, MString Name);
+  void SetTACHistogramName(unsigned int DetID, MString Name);
 
-  //! Add data to the depth histogram
+  //! Add data to the TAC histogram
   //!  0    1    2    3 
   //!  4    5    6    7
   //!  8    9   10   11
-  void AddDepth(unsigned int DetID, double Depth);
+  void AddTAC(unsigned int DetID, double TAC);
 
   // protected methods:
  protected:
@@ -94,10 +90,10 @@ class MGUIExpoDepthCalibration2024 : public MGUIExpo
 
   // private members:
  private:
-  //! Depth canvas
-  unordered_map<unsigned int, TRootEmbeddedCanvas*> m_DepthCanvases;
-  //! Depth vs detector ID histogram
-  unordered_map<unsigned int, TH1D*> m_DepthHistograms;
+  //! TAC canvas
+  unordered_map<unsigned int, TRootEmbeddedCanvas*> m_TACCanvases;
+  //! TAC vs detector ID histogram
+  unordered_map<unsigned int, TH1D*> m_TACHistograms;
 
   //! Detectors in x direction
   unsigned int m_NColumns;
@@ -109,15 +105,15 @@ class MGUIExpoDepthCalibration2024 : public MGUIExpo
   
   //! The number of bins of the histogram
   unordered_map<unsigned int, unsigned int> m_NBins;
-  //! The minimum depth
+  //! The minimum TAC
   unordered_map<unsigned int, double> m_Min;
-  //! The maximum depth
+  //! The maximum TAC
   unordered_map<unsigned int, double> m_Max;
   
 
 #ifdef ___CLING___
  public:
-  ClassDef(MGUIExpoDepthCalibration2024, 1) // basic class for dialog windows
+  ClassDef(MGUIExpoTACcut, 1) // basic class for dialog windows
 #endif
 
 };
