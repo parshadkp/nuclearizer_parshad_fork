@@ -1720,7 +1720,9 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       SH->SetDetectorID(Hit.m_ROE.GetDetectorID());
       SH->SetStripID(Hit.m_ROE.GetStripID());
       SH->IsXStrip(Hit.m_ROE.IsLowVoltageStrip());
-      // cout << "setting ADC units: " << Hit.m_ADC << endl;
+      // if (Hit.m_Energy < 0) {
+      //   cout << "setting ADC units: " << Hit.m_ADC << endl;
+      // }
       SH->SetADCUnits(Hit.m_ADC);
       // SH->SetTiming(Hit.m_Timing);
       SH->SetTAC(Hit.m_TAC);
