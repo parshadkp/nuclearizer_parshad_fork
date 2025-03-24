@@ -129,19 +129,38 @@ bool MModuleDepthCalibration2024::Initialize()
       DetID = 11;
     }
     MDDetector* det = m_Detectors[i];
-    // MString det_name = (det->GetDetectorVolume())->GetNamedDetectorName(0);
-    if (det->GetNNamedDetectors() > 0){
-      // TODO: determine thickness of each detector using the geometry file
-      // cout << "Trying to get thickness from the geometry file..." << endl;
-      // cout << "step 1" << endl;
-      // MDVolume* vol = det->GetSensitiveVolume(0); 
-      // cout << "step 2" << endl;
-      // MDShapeBRIK* shape = dynamic_cast<MDShapeBRIK*>(vol->GetShape());
-      // cout << "step 3" << endl;
-      // double thickness = (shape->GetSize()).GetZ();
-      // cout << "Success, the thickness is " << thickness << " cm" << endl;
-      // m_Thicknesses[DetID] = thickness;
-      MString det_name = det->GetNamedDetectorName(0);
+    // // Sean's original version
+    // // MString det_name = (det->GetDetectorVolume())->GetNamedDetectorName(0);
+    // if (det->GetNNamedDetectors() > 0){
+    //   // TODO: determine thickness of each detector using the geometry file
+    //   // cout << "Trying to get thickness from the geometry file..." << endl;
+    //   // cout << "step 1" << endl;
+    //   // MDVolume* vol = det->GetSensitiveVolume(0); 
+    //   // cout << "step 2" << endl;
+    //   // MDShapeBRIK* shape = dynamic_cast<MDShapeBRIK*>(vol->GetShape());
+    //   // cout << "step 3" << endl;
+    //   // double thickness = (shape->GetSize()).GetZ();
+    //   // cout << "Success, the thickness is " << thickness << " cm" << endl;
+    //   // m_Thicknesses[DetID] = thickness;
+    //   MString det_name = det->GetNamedDetectorName(0);
+    //   m_DetectorNames[DetID] = det_name;
+    //   MDStrip3D* strip = dynamic_cast<MDStrip3D*>(det);
+    //   m_XPitches[DetID] = strip->GetPitchX();
+    //   m_YPitches[DetID] = strip->GetPitchY();
+    //   m_NXStrips[DetID] = strip->GetNStripsX();
+    //   m_NYStrips[DetID] = strip->GetNStripsY();
+    //   cout << "Found detector " << det_name << " corresponding to DetID=" << DetID << "." << endl;
+    //   cout << "Number of X strips: " << m_NXStrips[DetID] << endl;
+    //   cout << "Number of Y strips: " << m_NYStrips[DetID] << endl;
+    //   cout << "X strip pitch: " << m_XPitches[DetID] << endl;
+    //   cout << "Y strip pitch: " << m_YPitches[DetID] << endl;
+    //   m_DetectorIDs.push_back(DetID);
+    // }
+
+    // Hack for EM Mass model
+    MString det_name = det->GetName();
+    if (det_name == "Q0D0") {
+      cout << det_name << endl;
       m_DetectorNames[DetID] = det_name;
       MDStrip3D* strip = dynamic_cast<MDStrip3D*>(det);
       m_XPitches[DetID] = strip->GetPitchX();
@@ -379,12 +398,15 @@ bool MModuleDepthCalibration2024::AnalyzeEvent(MReadOutAssembly* Event)
     LocalPosition.SetXYZ(Xpos, Ypos, Zpos);
     LocalOrigin.SetXYZ(0.0,0.0,0.0);
     // cout << m_DetectorNames[DetID] << endl;
-    GlobalPosition = m_Geometry->GetGlobalPosition(LocalPosition, m_DetectorNames[DetID]);
+    // GlobalPosition = m_Geometry->GetGlobalPosition(LocalPosition, m_DetectorNames[DetID]); // Original
+    MDVolumeSequence VolumeSequence = m_Geometry->GetVolumeSequence(LocalPosition, false, false);     // Hack for EM Mass Model
+    GlobalPosition = VolumeSequence.GetPositionInFirstVolume(LocalPosition, VolumeSequence.GetSensitiveVolume());    // Hack for EM Mass Model
     // cout << "Found the GlobalPosition" << endl;
 
     // Make sure XYZ resolution are correctly mapped to the global coord system.
     PositionResolution.SetXYZ(Xsigma, Ysigma, Zsigma);
-    GlobalResolution = (m_Geometry->GetGlobalPosition(PositionResolution, m_DetectorNames[DetID]) - m_Geometry->GetGlobalPosition(LocalOrigin, m_DetectorNames[DetID])).Abs();
+    // GlobalResolution = (m_Geometry->GetGlobalPosition(PositionResolution, m_DetectorNames[DetID]) - m_Geometry->GetGlobalPosition(LocalOrigin, m_DetectorNames[DetID])).Abs(); // Original 
+    GlobalResolution = (VolumeSequence.GetPositionInFirstVolume(PositionResolution, VolumeSequence.GetSensitiveVolume()) - VolumeSequence.GetPositionInFirstVolume(LocalOrigin, VolumeSequence.GetSensitiveVolume())).Abs();    // Hack for EM Mass Model
     
     // cout << "Set the PositionResolution vector" << endl;
 

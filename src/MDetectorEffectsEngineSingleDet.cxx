@@ -387,75 +387,94 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
  
     m_IsShieldDead = false;
 
-    // // This is where shield veto code will go ...
-    for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){
-      MSimHT* HT = SimEvent->GetHTAt(h);
 
-      MDVolumeSequence* VS = HT->GetVolumeSequence();
-      MDDetector* Detector = VS->GetDetector();
-      MString DetName = Detector->GetName();
-      // cout << DetName << ": " << HT->GetDetectorType() << endl;
+    // Check for named detectors in mass model
+    // for (unsigned int h = 0; h < SimEvent->GetNHTs(); ++h) {
+    //   MSimHT* HT = SimEvent->GetHTAt(h);
       
-      if (HT->GetDetectorType() == 8) {
-        MDVolumeSequence* VS = HT->GetVolumeSequence();
-        MDDetector* Detector = VS->GetDetector();
-        MString DetName = Detector->GetName();
+    //   MDVolumeSequence* VS = HT->GetVolumeSequence();
+    //   MDDetector* Detector = VS->GetDetector();
+    //   MString DetectorName = Detector->GetName();
 
-        DetName.RemoveAllInPlace("BGO_Coinc_sideX_neg_");
-        ShieldDetNum = DetName.ToInt();
-        ShieldDetNum = ShieldDetNum - 1;
-        energy = HT->GetEnergy();
-        ShieldDetGroup = 0; // Detector panel with the hit
-        energy = NoiseShieldEnergy(energy,DetName);
-        HT->SetEnergy(energy);
+    //   cout << Detector->GetNNamedDetectors() << endl;
+    //   if (!Detector->HasNamedDetector(DetectorName)) {
+    //     cout << "Named Detector not found " << DetectorName << " " << HT->GetDetectorType() << " " << HT->GetEnergy() << endl;
+    //   }
+    //   else {
+    //     cout << "Named Detector found " << DetectorName << " " << HT->GetDetectorType() << " " << HT->GetEnergy() << endl;
+    //   }
+    // }
 
-        if ((energy > m_ShieldThreshold)){ //"Shield" needs to change; In Carolyn's mass model this is BGO_Coinc_sideX_neg. Need to find a better naming scheme.
 
-          bool found = false;
+    // // // This is where shield veto code will go ...
+    // for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){
+    //   MSimHT* HT = SimEvent->GetHTAt(h);
 
-          // Traverse the 2D vector
-          for (size_t i = 0; i < m_ShieldPanelGroups.size(); ++i) {
-            for (size_t j = 0; j < m_ShieldPanelGroups[i].size(); ++j) {
-              if (m_ShieldPanelGroups[i][j] == ShieldDetNum) {
-                ShieldDetGroup = i;
-                found = true;
-                break;
-              }
-            }
-            if (found) break; // Exit loop once found
-          }
+    //   MDVolumeSequence* VS = HT->GetVolumeSequence();
+    //   MDDetector* Detector = VS->GetDetector();
+    //   MString DetName = Detector->GetName();
+    //   // cout << DetName << ": " << HT->GetDetectorType() << endl;
+      
+    //   if (HT->GetDetectorType() == 8) {
+    //     MDVolumeSequence* VS = HT->GetVolumeSequence();
+    //     MDDetector* Detector = VS->GetDetector();
+    //     MString DetName = Detector->GetName();
 
-          if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDeadtime[ShieldDetGroup] < evt_time) {
-          // Event occured after deadtime
+    //     DetName.RemoveAllInPlace("BGO_Coinc_sideX_neg_");
+    //     ShieldDetNum = DetName.ToInt();
+    //     ShieldDetNum = ShieldDetNum - 1;
+    //     energy = HT->GetEnergy();
+    //     ShieldDetGroup = 0; // Detector panel with the hit
+    //     energy = NoiseShieldEnergy(energy,DetName);
+    //     HT->SetEnergy(energy);
 
-            for (int group=0; group<nShieldPanels; group++) {
-              m_ShieldHitID[group].clear();
-            }
-            m_ShieldLastHitTime[ShieldDetGroup] = evt_time;
-            m_ShieldHitID[ShieldDetGroup].push_back(ShieldDetNum);
-            m_ShieldVeto = true;
-            }
+    //     if ((energy > m_ShieldThreshold)){ //"Shield" needs to change; In Carolyn's mass model this is BGO_Coinc_sideX_neg. Need to find a better naming scheme.
 
-          else if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDelayBefore > evt_time) {
-            // Event occured within coincidence window so append all strip IDs
-            m_ShieldHitID[ShieldDetGroup].push_back(ShieldDetNum);
-            m_ShieldVeto = true;
-          }
+    //       bool found = false;
 
-          else if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDeadtime[ShieldDetGroup] > evt_time) {
-            // Event occured within deadtime
-            m_IsShieldDead = true;
-          }
-        }
-      }
-    }
+    //       // Traverse the 2D vector
+    //       for (size_t i = 0; i < m_ShieldPanelGroups.size(); ++i) {
+    //         for (size_t j = 0; j < m_ShieldPanelGroups[i].size(); ++j) {
+    //           if (m_ShieldPanelGroups[i][j] == ShieldDetNum) {
+    //             ShieldDetGroup = i;
+    //             found = true;
+    //             break;
+    //           }
+    //         }
+    //         if (found) break; // Exit loop once found
+    //       }
 
-    for (int group=0; group<nShieldPanels; group++) {
-      // Calculates deadtime after each merged strip hit list.
-      if (!m_IsShieldDead) {
-        m_ShieldDeadtime[group] = dTimeASICs(m_ShieldHitID[group], true);
-      }
-    }
+    //       if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDeadtime[ShieldDetGroup] < evt_time) {
+    //       // Event occured after deadtime
+
+    //         for (int group=0; group<nShieldPanels; group++) {
+    //           m_ShieldHitID[group].clear();
+    //         }
+    //         m_ShieldLastHitTime[ShieldDetGroup] = evt_time;
+    //         m_ShieldHitID[ShieldDetGroup].push_back(ShieldDetNum);
+    //         m_ShieldVeto = true;
+    //         }
+
+    //       else if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDelayBefore > evt_time) {
+    //         // Event occured within coincidence window so append all strip IDs
+    //         m_ShieldHitID[ShieldDetGroup].push_back(ShieldDetNum);
+    //         m_ShieldVeto = true;
+    //       }
+
+    //       else if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDeadtime[ShieldDetGroup] > evt_time) {
+    //         // Event occured within deadtime
+    //         m_IsShieldDead = true;
+    //       }
+    //     }
+    //   }
+    // }
+
+    // for (int group=0; group<nShieldPanels; group++) {
+    //   // Calculates deadtime after each merged strip hit list.
+    //   if (!m_IsShieldDead) {
+    //     m_ShieldDeadtime[group] = dTimeASICs(m_ShieldHitID[group], true);
+    //   }
+    // }
       
 
     //get interactions to look for ionization in hits
@@ -493,13 +512,13 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       MDDetector* Detector = VS->GetDetector();
       MString DetectorName = Detector->GetName();
 
-      // Detector->GetNamedDetectorName(0);
-      if (!Detector->HasNamedDetector(DetectorName)) {
-        cout << "Named Detector not found " << DetectorName << " " << HT->GetDetectorType() << " " << HT->GetEnergy() << endl;
-      }
-      else {
-        cout << "Named Detector found " << DetectorName << " " << HT->GetDetectorType() << " " << HT->GetEnergy() << endl;
-      }
+      // cout << Detector->GetNNamedDetectors() << endl;
+      // if (!Detector->HasNamedDetector(DetectorName)) {
+      //   cout << "Named Detector not found " << DetectorName << " " << HT->GetDetectorType() << " " << HT->GetEnergy() << endl;
+      // }
+      // else {
+      //   cout << "Named Detector found " << DetectorName << " " << HT->GetDetectorType() << " " << HT->GetEnergy() << endl;
+      // }
 
       // cout << "DetectorName = " << DetectorName << endl;
       if(!DetectorName.BeginsWith("Q0D")){
@@ -1740,7 +1759,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       SH->IsXStrip(Hit.m_ROE.IsLowVoltageStrip());
       // cout << "setting ADC units: " << Hit.m_ADC << endl;
       SH->SetADCUnits(Hit.m_ADC);
-      SH->SetTiming(Hit.m_Timing);
+      // SH->SetTiming(Hit.m_Timing);
       SH->SetTAC(Hit.m_TAC);
       // cout << Hit.m_Timing << endl;
       SH->SetPreampTemp(20);
