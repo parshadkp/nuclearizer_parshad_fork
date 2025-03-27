@@ -1779,7 +1779,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
         m_Roa<<IAs[i]->ToSimString()<<endl;
       }
       for (MDEEStripHit Hit: MergedStripHits){
-        m_Roa<<"UH "<<Hit.m_ROE.GetDetectorID()<<" "<<Hit.m_ROE.GetStripID()<<" "<<(Hit.m_ROE.IsLowVoltageStrip() ? "l" : "h")<<" "<<Hit.m_ADC<<" "<<Hit.m_Timing<<" "<<Hit.m_PreampTemp;
+        m_Roa<<"UH "<<Hit.m_ROE.GetDetectorID()<<" "<<Hit.m_ROE.GetStripID()<<" "<<(Hit.m_ROE.IsLowVoltageStrip() ? "l" : "h")<<" "<<Hit.m_ADC<<" "<<Hit.m_TAC<<" "<<Hit.m_PreampTemp;
         
         MString Origins;
         for (int Origin: Hit.m_Origins) {
