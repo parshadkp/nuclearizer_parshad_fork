@@ -34,3 +34,6 @@
 .python-version
 .DS_Store
 .DS_Store
+.DS_Store
+resource/.DS_Store
+resource/calibration/.DS_Store
