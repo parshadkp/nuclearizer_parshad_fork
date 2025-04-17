@@ -381,9 +381,10 @@ private:
 	vector<vector<vector<vector<double> > > > m_CrosstalkCoefficients = vector<vector<vector<vector<double> > > >(12, vector<vector<vector<double> > > (2, vector<vector<double> > (2, vector<double> (2))));
 
   unsigned long m_MultipleHitsCounter;
-  unsigned long m_TotalHitsCounter;
+  unsigned long m_TotalStripHitsCounter;
   unsigned long m_ChargeLossCounter;
-  unsigned long m_TotalHitsBeforeDeadtime;
+  unsigned long m_NumShieldHitCounts;
+
   
   //! Strip Delay for ENABLE to fall
   double m_StripCoincidenceWindow;
@@ -394,6 +395,7 @@ private:
   double m_StripDelayAfter2;
   double m_StripDelayAfter;
   int m_StripHitsErased;
+  int m_NumBGOHitsErased;
   double m_ShieldPulseDuration;
   vector<double> m_ShieldLastHitTime = vector<double>(nShieldPanels);	
   double m_ShieldDelayBefore;
@@ -402,6 +404,8 @@ private:
   bool m_IsShieldDead;
   //! dead time on the shields
   vector<double> m_ShieldDeadtime = vector<double>(nShieldPanels);
+  vector<double> m_TotalShieldDeadtime = vector<double>(nShieldPanels);
+
 	//! whether or not the event is vetoed by the shields
 	bool m_ShieldVeto;
 	//! shield threshold
@@ -421,9 +425,7 @@ private:
   //   {0}
   // };
 
-  
-  long m_NumShieldCounts;
-  
+    
 	//! drift constant: used for charge sharing due to diffusion; one for each detector
 	vector<double> m_DriftConstant;
   // double m_DriftConstant;
