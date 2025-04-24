@@ -345,7 +345,7 @@ private:
   //! Stores total dead time of the instrument
   double m_StripsTotalDeadtime;
   //! Bool to store if ASIC is dead or not
-  bool IsASICDead;
+  bool IsGeDDead;
 
 	//! Stores trigger rates (number of events) for each detector
   vector<int> m_TriggerRates = vector<int>(nDets);
@@ -384,7 +384,8 @@ private:
   unsigned long m_TotalStripHitsCounter;
   unsigned long m_ChargeLossCounter;
   unsigned long m_NumShieldHitCounts;
-
+  unsigned long m_ShieldVetoCounter;
+  
   
   //! Strip Delay for ENABLE to fall
   double m_StripCoincidenceWindow;
@@ -397,7 +398,8 @@ private:
   int m_StripHitsErased;
   int m_NumBGOHitsErased;
   double m_ShieldPulseDuration;
-  vector<double> m_ShieldLastHitTime = vector<double>(nShieldPanels);	
+  vector<double> m_ShieldLastHitTime = vector<double>(nShieldPanels);
+  double m_ShieldVetoTime;
   double m_ShieldDelayBefore;
   double m_ShieldDelayAfter;
 	double m_ShieldVetoWindowSize;

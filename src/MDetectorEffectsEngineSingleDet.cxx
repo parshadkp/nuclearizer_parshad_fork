@@ -203,7 +203,7 @@ bool MDetectorEffectsEngineSingleDet::Initialize()
   m_StripDelayAfter1 = m_StripDelayAfter1FromFile;
   m_StripDelayAfter2 = m_StripDelayAfter2FromFile;
   m_StripDelayAfter = m_StripDelayAfter1 + m_StripDelayAfter2;
-  IsASICDead = false;
+  IsGeDDead = false;
   m_countGR = 0;
 
   m_StripsCurrentDeadtime = 0.0;
@@ -230,6 +230,7 @@ bool MDetectorEffectsEngineSingleDet::Initialize()
   m_ShieldDelayBefore = 0.1e-6;
   m_ShieldDelayAfter = 0.4e-6; //this is just a guess based on when veto window occurs!
   m_ShieldVetoWindowSize = 1.5e-6;
+  m_ShieldVetoTime = 0;
   for (int i=0; i<nShieldPanels; i++){
     m_ShieldLastHitTime[i] = -10;   // start at -10s so that it doesn't veto beginning events by accident
     m_ShieldDeadtime[i] = 0;
@@ -237,7 +238,7 @@ bool MDetectorEffectsEngineSingleDet::Initialize()
   }
   m_IsShieldDead = false;
   m_NumShieldHitCounts = 0;
-
+  m_ShieldVetoCounter = 0;
   
   // initialize constants for charge sharing due to diffusion
   double k = 1.38e-16; //Boltzmann's constant
@@ -436,6 +437,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
               m_ShieldHitID[group].clear();
             }
             m_ShieldLastHitTime[ShieldDetGroup] = evt_time;
+            m_ShieldVetoTime = evt_time;
             m_ShieldHitID[ShieldDetGroup].push_back(ShieldDetNum);
             m_ShieldVeto = true;
             m_TotalShieldDeadtime[ShieldDetGroup] += m_ShieldDeadtime[ShieldDetGroup];
@@ -443,6 +445,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
 
           else if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDelayBefore > evt_time) {
             // Event occured within coincidence window so append all strip IDs
+            m_ShieldVetoTime = evt_time;
             m_ShieldHitID[ShieldDetGroup].push_back(ShieldDetNum);
             m_ShieldVeto = true;
           }
@@ -907,22 +910,25 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       
     }
     
-// //     //delete event and update deadtime if the event was vetoed by the shields
-// //     //can't do this earlier because need to know which detectors got hit
-// //     if (m_ShieldVeto){
-// //       for (int det=0; det<nDets; det++){
-// //         if (detectorsHitForShieldVeto[det] == 1){
-// //           //make sure CC not already dead
-// //           if (evt_time > m_LastHitTimeByDet[det] + m_DetectorDeadTime[det]){
-// //             m_DetectorDeadTime[det] = 1e-5;
-// //             m_LastHitTimeByDet[det] = evt_time;
-// //             m_StripsTotalDeadtime[det] += m_DetectorDeadTime[det];
-// //           }
-// //         }
-// //       }
-// //       delete SimEvent;
-// //       continue;
-// //     }
+    //delete event and update deadtime if the event was vetoed by the shields
+    //can't do this earlier because need to know which detectors got hit
+    // if (m_ShieldVeto){
+    if (((m_ShieldVetoTime + m_ShieldVetoWindowSize) >= evt_time) && (evt_time >= m_ShieldVetoTime)) {
+      for (int det=0; det<nDets; det++){
+        if (detectorsHitForShieldVeto[det] == 1){
+          //make sure CC not already dead
+          if (!IsGeDDead){
+            m_StripsCurrentDeadtime = 2.8e-6;
+            m_ASICLastHitTime = evt_time;
+            m_StripsTotalDeadtime += m_StripsCurrentDeadtime;
+          }
+        }
+      }
+      m_ShieldVetoCounter += SimEvent->GetNHTs();
+      delete SimEvent;
+      continue;
+    }
+    // }
     // if (StripHits.size() != 0) {
     //   cout << "Number of strip hits: " << StripHits.size() << endl;
     // }
@@ -1314,7 +1320,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     list<MDEEStripHit>::iterator gr = GuardRingHits.begin();
     vector<int> grHit = vector<int>(nDets,0);
     while (gr != GuardRingHits.end()) {
-      if ((*gr).m_Energy > m_GuardRingThresholds[(*gr).m_ROE]){ // Need to enable once we have the GR thresholds
+      if ((*gr).m_Energy > m_GuardRingThresholds[(*gr).m_ROE]){ // Need an updated file
         int detID = (*gr).m_ROE.GetDetectorID();
         grHit[detID] = 1;
       }
@@ -1332,7 +1338,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     for (int det=0; det<nDets; det++){
       if (grHit[det] == 1){
         //make sure CC not already dead
-        if (!IsASICDead){
+        if (!IsGeDDead){
           m_StripsCurrentDeadtime = 2.8e-6;
           m_ASICLastHitTime = evt_time;
           m_StripsTotalDeadtime += m_StripsCurrentDeadtime;
@@ -1367,7 +1373,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     
     bool ASICFirstHitAfterDead = false;
     double det = 500;
-    IsASICDead = false;
+    IsGeDDead = false;
     list<MDEEStripHit>::iterator i = MergedStripHits.begin();
     int ASICofDet = 5;
 
@@ -1431,7 +1437,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
 
       else if (m_ASICLastHitTime + m_StripsCurrentDeadtime > evt_time) {
         // Event occured within deadtime
-        IsASICDead = true;
+        IsGeDDead = true;
         m_StripHitsErased += 1;
         i = MergedStripHits.erase(i);
       }
@@ -1447,7 +1453,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     for (int det=0; det<nDets; det++) {
       // Calculates deadtime after each merged strip hit list.
       for (int ASIC=0; ASIC<nASICs; ASIC++) {
-        if (!IsASICDead) {
+        if (!IsGeDDead) {
           m_ASICDeadTime[det][ASIC] = dTimeASICs(m_ASICHitStripID[det][ASIC]);
           if (m_ASICDeadTime[det][ASIC] > m_StripsCurrentDeadtime) {
             m_StripsCurrentDeadtime = m_ASICDeadTime[det][ASIC];
@@ -1801,12 +1807,22 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
 //! Finalize the module
 bool MDetectorEffectsEngineSingleDet::Finalize()
 {
-  cout << "###################" << endl << "DEE STATISTICS" << "###################" << endl;
-  cout << "###################" << endl << "Strips" << "###################" << endl;
+  cout << "###################" << endl << "DEE STATISTICS" << endl << "###################" << endl;
+
+  cout << "###################" << endl << "Shields" << endl << "###################" << endl;
+  cout << "Total BGO hits before BGO deadtime: " << m_NumShieldHitCounts << endl;
+  for(int i=0; i<nShieldPanels; i++){
+    cout << "Shield Panel "<< i << " dead time: " << m_TotalShieldDeadtime[i] << endl;
+  }
+  cout << "BGO hits erased due to BGO being dead: " << m_NumBGOHitsErased << endl;
+  cout << "Shield vetoes: " << m_ShieldVetoCounter << endl;
+  cout << "Shield rate after deadtime (cps): " << (m_NumShieldHitCounts-m_NumBGOHitsErased)/(m_LastTime-m_FirstTime) << endl;
+  
+  cout << "###################" << endl << "Strips" << endl << "###################" << endl;
   cout << "Total strip hits before deadtime: " << m_TotalStripHitsCounter << endl;
   // cout << "Hits in Detector with name: " <<  DetectorName << endl;
-  cout << "number of events with multiple hits per strip: " << m_MultipleHitsCounter << endl;
-  cout << "charge loss applies counter: " << m_ChargeLossCounter << endl;
+  cout << "Number of events with multiple hits per strip: " << m_MultipleHitsCounter << endl;
+  cout << "Charge loss applies counter: " << m_ChargeLossCounter << endl;
   cout << "Guard Ring hits: " << m_countGR << endl;
   cout << "Dead time " << endl;
   cout << "Total Deadtime of the instrument: " << m_StripsTotalDeadtime << endl;
@@ -1816,15 +1832,7 @@ bool MDetectorEffectsEngineSingleDet::Finalize()
   for (int i=0; i<nDets; i++){
     cout << i << ":\t" << m_TriggerRates[i]/(m_LastTime-m_FirstTime) << endl;
   }
-
-  cout << "###################" << endl << "Shields" << "###################" << endl;
-  cout << "Total BGO hits before BGO deadtime: " << m_NumShieldHitCounts << endl;
-  for(int i=0; i<nShieldPanels; i++){
-    cout << "Shield Panel "<< i << " dead time: " << m_TotalShieldDeadtime[i] << endl;
-  }
-  cout << "BGO hits erased due to BGO being dead: " << m_NumBGOHitsErased << endl;
-  cout << "Shield rate after deadtime (cps): " << (m_NumShieldHitCounts-m_NumBGOHitsErased)/(m_LastTime-m_FirstTime) << endl;
-  cout << "###################" << endl << "END DEE STATISTICS" << "###################" << endl;
+  cout << "###################" << endl << "END DEE STATISTICS" << endl << "###################" << endl;
 
   
   // cout << "Max buffer full index: " << m_MaxBufferFullIndex << '\t' << "Detector " << m_MaxBufferDetector << endl;
