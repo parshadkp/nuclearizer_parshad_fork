@@ -1792,6 +1792,7 @@ bool MDetectorEffectsEngineSingleDet::Finalize()
   cout << "Dead time " << endl;
   // Single Enable Line
   cout << "Total Deadtime of the Instrument: " << m_StripsTotalDeadtime << endl;
+  cout << "Livetime fraction: " << 1-(m_StripsTotalDeadtime/(m_LastTime-m_FirstTime)) << endl;
   cout << "Avg Deadtime per Hit: " << m_StripsTotalDeadtime/m_TotalHitsBeforeDeadtime << endl;
   cout << "Trigger rates (events per second)" << endl;
   for (int i=0; i<nDets; i++){
