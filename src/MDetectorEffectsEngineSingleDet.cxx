@@ -193,9 +193,9 @@ bool MDetectorEffectsEngineSingleDet::Initialize()
   
   //count how many events have multiple hits per strip
   m_MultipleHitsCounter = 0;
-  m_TotalHitsCounter = 0;
+  m_TotalStripHitsCounter = 0;
   m_ChargeLossCounter = 0;
-  m_TotalHitsBeforeDeadtime = 0;
+  m_NumShieldHitCounts = 0;
   
   // Strip deadtime parameters
   m_StripCoincidenceWindow = m_StripCoincidenceWindowFromFile;
@@ -203,7 +203,7 @@ bool MDetectorEffectsEngineSingleDet::Initialize()
   m_StripDelayAfter1 = m_StripDelayAfter1FromFile;
   m_StripDelayAfter2 = m_StripDelayAfter2FromFile;
   m_StripDelayAfter = m_StripDelayAfter1 + m_StripDelayAfter2;
-  IsASICDead = false;
+  IsGeDDead = false;
   m_countGR = 0;
 
   m_StripsCurrentDeadtime = 0.0;
@@ -221,6 +221,7 @@ bool MDetectorEffectsEngineSingleDet::Initialize()
   }
 
   m_StripHitsErased = 0;
+  m_NumBGOHitsErased = 0;
 
   // Shield deadtime parameters
   // for shield veto: shield pulse duration and card cage delay: constant for now
@@ -229,13 +230,15 @@ bool MDetectorEffectsEngineSingleDet::Initialize()
   m_ShieldDelayBefore = 0.1e-6;
   m_ShieldDelayAfter = 0.4e-6; //this is just a guess based on when veto window occurs!
   m_ShieldVetoWindowSize = 1.5e-6;
+  m_ShieldVetoTime = 0;
   for (int i=0; i<nShieldPanels; i++){
     m_ShieldLastHitTime[i] = -10;   // start at -10s so that it doesn't veto beginning events by accident
     m_ShieldDeadtime[i] = 0;
+    m_TotalShieldDeadtime[i] = 0;
   }
   m_IsShieldDead = false;
-  m_NumShieldCounts = 0;
-
+  m_NumShieldHitCounts = 0;
+  m_ShieldVetoCounter = 0;
   
   // initialize constants for charge sharing due to diffusion
   double k = 1.38e-16; //Boltzmann's constant
@@ -387,68 +390,82 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
  
     m_IsShieldDead = false;
 
+
     // // This is where shield veto code will go ...
-    // for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){
-    //   MSimHT* HT = SimEvent->GetHTAt(h);
-    //   if (HT->GetDetectorType() == 8) {
-    //     MDVolumeSequence* VS = HT->GetVolumeSequence();
-    //     MDDetector* Detector = VS->GetDetector();
-    //     MString DetName = Detector->GetName();
+    for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){
+      MSimHT* HT = SimEvent->GetHTAt(h);
 
-    //     ShieldDetNum = atoi(DetName.GetSubString(6,7));
-    //     energy = HT->GetEnergy();
-    //     ShieldDetGroup = 0;
-    //     energy = NoiseShieldEnergy(energy,DetName);
-    //     HT->SetEnergy(energy);
+      MDVolumeSequence* VS = HT->GetVolumeSequence();
+      MDDetector* Detector = VS->GetDetector();
+      MString DetName = Detector->GetName();
+      // cout << DetName << ": " << HT->GetDetectorType() << endl;
+      
+      if (HT->GetDetectorType() == 8) {
+        // cout << "Shield hit why?" << endl;
+        m_NumShieldHitCounts += 1;
+        MDVolumeSequence* VS = HT->GetVolumeSequence();
+        MDDetector* Detector = VS->GetDetector();
+        MString DetName = Detector->GetName();
 
-    //     if (DetName.GetSubString(0,6) == "Shield" && (energy > m_ShieldThreshold)){ //"Shield" needs to change
+        DetName.RemoveAllInPlace("BGO_X0_");
+        ShieldDetNum = DetName.ToInt();
+        ShieldDetNum = ShieldDetNum - 1;
+        energy = HT->GetEnergy();
+        ShieldDetGroup = 0; // Detector panel with the hit
+        energy = NoiseShieldEnergy(energy,DetName);
+        HT->SetEnergy(energy);
 
-    //       bool found = false;
+        if ((energy > m_ShieldThreshold)){ //"Shield" needs to change; In Carolyn's mass model this is BGO_Coinc_sideX_neg. Need to find a better naming scheme.
 
-    //       // Traverse the 2D vector
-    //       for (size_t i = 0; i < m_ShieldPanelGroups.size(); ++i) {
-    //         for (size_t j = 0; j < m_ShieldPanelGroups[i].size(); ++j) {
-    //           if (m_ShieldPanelGroups[i][j] == ShieldDetNum) {
-    //             ShieldDetGroup = i;
-    //             found = true;
-    //             break;
-    //           }
-    //         }
-    //         if (found) break; // Exit loop once found
-    //       }
+          bool found = false;
 
-    //       if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDeadtime[ShieldDetGroup] < evt_time) {
-    //       // Event occured after deadtime
+          // Traverse the 2D vector
+          for (size_t i = 0; i < m_ShieldPanelGroups.size(); ++i) {
+            for (size_t j = 0; j < m_ShieldPanelGroups[i].size(); ++j) {
+              if (m_ShieldPanelGroups[i][j] == ShieldDetNum) {
+                ShieldDetGroup = i;
+                found = true;
+                break;
+              }
+            }
+            if (found) break; // Exit loop once found
+          }
 
-    //         for (int group=0; group<nShieldPanels; group++) {
-    //           m_ShieldHitID[group].clear();
-    //         }
-    //         m_ShieldLastHitTime[ShieldDetGroup] = evt_time;
-    //         m_ShieldHitID[ShieldDetGroup].push_back(ShieldDetNum);
-    //         m_ShieldVeto = true;
-    //         }
+          if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDeadtime[ShieldDetGroup] < evt_time) {
+          // Event occured after deadtime
 
-    //       else if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDelayBefore > evt_time) {
-    //         // Event occured within coincidence window so append all strip IDs
-    //         m_ShieldHitID[ShieldDetGroup].push_back(ShieldDetNum);
-    //         m_ShieldVeto = true;
-    //       }
+            for (int group=0; group<nShieldPanels; group++) {
+              m_ShieldHitID[group].clear();
+            }
+            m_ShieldLastHitTime[ShieldDetGroup] = evt_time;
+            m_ShieldVetoTime = evt_time;
+            m_ShieldHitID[ShieldDetGroup].push_back(ShieldDetNum);
+            m_ShieldVeto = true;
+            m_TotalShieldDeadtime[ShieldDetGroup] += m_ShieldDeadtime[ShieldDetGroup];
+            }
 
-    //       else if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDeadtime[ShieldDetGroup] > evt_time) {
-    //         // Event occured within deadtime
-    //         m_IsShieldDead = true;
-    //       }
-    //     }
-    //   }
-    // }
+          else if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDelayBefore > evt_time) {
+            // Event occured within coincidence window so append all strip IDs
+            m_ShieldVetoTime = evt_time;
+            m_ShieldHitID[ShieldDetGroup].push_back(ShieldDetNum);
+            m_ShieldVeto = true;
+          }
 
-    // for (int group=0; group<nShieldPanels; group++) {
-    //   // Calculates deadtime after each merged strip hit list.
-    //   if (!m_IsShieldDead) {
-    //     m_ShieldDeadtime[group] = dTimeASICs(m_ShieldHitID[group], true);
-    //   }
-    // }
-    // // End shield veto code
+          else if (m_ShieldLastHitTime[ShieldDetGroup] + m_ShieldDeadtime[ShieldDetGroup] > evt_time) {
+            // Event occured within deadtime
+            m_IsShieldDead = true;
+            m_NumBGOHitsErased += 1;
+          }
+        }
+      }
+    }
+
+    for (int group=0; group<nShieldPanels; group++) {
+      // Calculates deadtime after each merged strip hit list.
+      if (!m_IsShieldDead) {
+        m_ShieldDeadtime[group] = dTimeASICs(m_ShieldHitID[group], true);
+      }
+    }
       
 
     //get interactions to look for ionization in hits
@@ -485,11 +502,22 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       MDVolumeSequence* VS = HT->GetVolumeSequence();
       MDDetector* Detector = VS->GetDetector();
       MString DetectorName = Detector->GetName();
+
+      // cout << Detector->GetNNamedDetectors() << endl;
+      // if (!Detector->HasNamedDetector(DetectorName)) {
+      //   cout << "Named Detector not found " << DetectorName << " " << HT->GetDetectorType() << " " << HT->GetEnergy() << endl;
+      // }
+      // else {
+      //   cout << "Named Detector found " << DetectorName << " " << HT->GetDetectorType() << " " << HT->GetEnergy() << endl;
+      // }
+
       // cout << "DetectorName = " << DetectorName << endl;
       if(!DetectorName.BeginsWith("D")){
         continue; //probably a shield hit.  this can happen if the veto flag is off for the shields
       }
       // Sets the detector ID for different hits. May need to change if there is a change in naming convention
+      // Seems like there are many hits with error "***  Error  ***  Named detector not found:"
+      
       DetectorName.RemoveAllInPlace("D");
       int DetectorID = DetectorName.ToInt()-1;
       
@@ -879,26 +907,30 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       if (pOrigHit){ StripHits.push_back(pSide); }
       if (nOrigHit){ StripHits.push_back(nSide); }
       
-      m_TotalHitsCounter++;
+      m_TotalStripHitsCounter++;
       
     }
     
-// //     //delete event and update deadtime if the event was vetoed by the shields
-// //     //can't do this earlier because need to know which detectors got hit
-// //     if (m_ShieldVeto){
-// //       for (int det=0; det<nDets; det++){
-// //         if (detectorsHitForShieldVeto[det] == 1){
-// //           //make sure CC not already dead
-// //           if (evt_time > m_LastHitTimeByDet[det] + m_DetectorDeadTime[det]){
-// //             m_DetectorDeadTime[det] = 1e-5;
-// //             m_LastHitTimeByDet[det] = evt_time;
-// //             m_StripsTotalDeadtime[det] += m_DetectorDeadTime[det];
-// //           }
-// //         }
-// //       }
-// //       delete SimEvent;
-// //       continue;
-// //     }
+    //delete event and update deadtime if the event was vetoed by the shields
+    //can't do this earlier because need to know which detectors got hit
+    // if (m_ShieldVeto){
+    if (((m_ShieldVetoTime + m_ShieldVetoWindowSize) >= evt_time) && (evt_time >= m_ShieldVetoTime)) {
+      // cout << "In shields why?" << endl;
+      for (int det=0; det<nDets; det++){
+        if (detectorsHitForShieldVeto[det] == 1){
+          //make sure CC not already dead
+          if (!IsGeDDead){
+            m_StripsCurrentDeadtime = 2.8e-6;
+            m_ASICLastHitTime = evt_time;
+            m_StripsTotalDeadtime += m_StripsCurrentDeadtime;
+          }
+        }
+      }
+      m_ShieldVetoCounter += SimEvent->GetNHTs();
+      delete SimEvent;
+      continue;
+    }
+    // }
     // if (StripHits.size() != 0) {
     //   cout << "Number of strip hits: " << StripHits.size() << endl;
     // }
@@ -1290,7 +1322,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     list<MDEEStripHit>::iterator gr = GuardRingHits.begin();
     vector<int> grHit = vector<int>(nDets,0);
     while (gr != GuardRingHits.end()) {
-      if ((*gr).m_Energy > m_GuardRingThresholds[(*gr).m_ROE]){ // Need to enable once we have the GR thresholds
+      if ((*gr).m_Energy > m_GuardRingThresholds[(*gr).m_ROE]){ // Need an updated file
         int detID = (*gr).m_ROE.GetDetectorID();
         grHit[detID] = 1;
       }
@@ -1308,7 +1340,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     for (int det=0; det<nDets; det++){
       if (grHit[det] == 1){
         //make sure CC not already dead
-        if (!IsASICDead){
+        if (!IsGeDDead){
           m_StripsCurrentDeadtime = 2.8e-6;
           m_ASICLastHitTime = evt_time;
           m_StripsTotalDeadtime += m_StripsCurrentDeadtime;
@@ -1343,14 +1375,12 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     
     bool ASICFirstHitAfterDead = false;
     double det = 500;
-    IsASICDead = false;
+    IsGeDDead = false;
     list<MDEEStripHit>::iterator i = MergedStripHits.begin();
     int ASICofDet = 5;
 
     while (i != MergedStripHits.end()) {
       // go through each merged strip hit list and add strip ids to a list of strips that are read out in parallel.
-      m_TotalHitsBeforeDeadtime += 1;
-
       det = (*i).m_ROE.GetDetectorID();
       ASICofDet = 5;
 
@@ -1409,7 +1439,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
 
       else if (m_ASICLastHitTime + m_StripsCurrentDeadtime > evt_time) {
         // Event occured within deadtime
-        IsASICDead = true;
+        IsGeDDead = true;
         m_StripHitsErased += 1;
         i = MergedStripHits.erase(i);
       }
@@ -1425,7 +1455,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     for (int det=0; det<nDets; det++) {
       // Calculates deadtime after each merged strip hit list.
       for (int ASIC=0; ASIC<nASICs; ASIC++) {
-        if (!IsASICDead) {
+        if (!IsGeDDead) {
           m_ASICDeadTime[det][ASIC] = dTimeASICs(m_ASICHitStripID[det][ASIC]);
           if (m_ASICDeadTime[det][ASIC] > m_StripsCurrentDeadtime) {
             m_StripsCurrentDeadtime = m_ASICDeadTime[det][ASIC];
@@ -1720,9 +1750,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       SH->SetDetectorID(Hit.m_ROE.GetDetectorID());
       SH->SetStripID(Hit.m_ROE.GetStripID());
       SH->IsXStrip(Hit.m_ROE.IsLowVoltageStrip());
-      // if (Hit.m_Energy < 0) {
-      //   cout << "setting ADC units: " << Hit.m_ADC << endl;
-      // }
+      // cout << "setting ADC units: " << Hit.m_ADC << endl;
       SH->SetADCUnits(Hit.m_ADC);
       // SH->SetTiming(Hit.m_Timing);
       SH->SetTAC(Hit.m_TAC);
@@ -1744,7 +1772,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
         m_Roa<<IAs[i]->ToSimString()<<endl;
       }
       for (MDEEStripHit Hit: MergedStripHits){
-        m_Roa<<"UH "<<Hit.m_ROE.GetDetectorID()<<" "<<Hit.m_ROE.GetStripID()<<" "<<(Hit.m_ROE.IsLowVoltageStrip() ? "l" : "h")<<" "<<Hit.m_ADC<<" "<<Hit.m_Timing<<" "<<Hit.m_PreampTemp;
+        m_Roa<<"UH "<<Hit.m_ROE.GetDetectorID()<<" "<<Hit.m_ROE.GetStripID()<<" "<<(Hit.m_ROE.IsLowVoltageStrip() ? "l" : "h")<<" "<<Hit.m_ADC<<" "<<Hit.m_TAC<<" "<<Hit.m_PreampTemp;
         
         MString Origins;
         for (int Origin: Hit.m_Origins) {
@@ -1781,27 +1809,35 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
 //! Finalize the module
 bool MDetectorEffectsEngineSingleDet::Finalize()
 {
-  cout << "total hits: " << m_TotalHitsCounter << endl;
+  cout << "###################" << endl << "DEE STATISTICS" << endl << "###################" << endl;
+
+  cout << "###################" << endl << "Shields" << endl << "###################" << endl;
+  cout << "Time of simulation: " << m_LastTime-m_FirstTime << endl;
+  cout << "Total BGO hits before BGO deadtime: " << m_NumShieldHitCounts << endl;
+  for(int i=0; i<nShieldPanels; i++){
+    cout << "Shield Panel "<< i << " dead time: " << m_TotalShieldDeadtime[i] << endl;
+  }
+  cout << "BGO hits erased due to BGO being dead: " << m_NumBGOHitsErased << endl;
+  cout << "Shield vetoes: " << m_ShieldVetoCounter << endl;
+  cout << "Shield rate after deadtime (cps): " << (m_NumShieldHitCounts-m_NumBGOHitsErased)/(m_LastTime-m_FirstTime) << endl;
+  
+  cout << "###################" << endl << "Strips" << endl << "###################" << endl;
+  cout << "Total strip hits before deadtime: " << m_TotalStripHitsCounter << endl;
   // cout << "Hits in Detector with name: " <<  DetectorName << endl;
-  cout << "number of events with multiple hits per strip: " << m_MultipleHitsCounter << endl;
-  cout << "charge loss applies counter: " << m_ChargeLossCounter << endl;
-  //	cout << "Num shield counts: " << m_NumShieldCounts << endl;
-  cout << "Shield rate (cps): " << m_NumShieldCounts/(m_LastTime-m_FirstTime) << endl;
-  cout << "Total Hits before Deadtime: " << m_TotalHitsBeforeDeadtime << endl;
-  cout << "Guard Ring Hits: " << m_countGR << endl;
+  cout << "Number of events with multiple hits per strip: " << m_MultipleHitsCounter << endl;
+  cout << "Charge loss applies counter: " << m_ChargeLossCounter << endl;
+  cout << "Guard Ring hits: " << m_countGR << endl;
   cout << "Dead time " << endl;
-  // Single Enable Line
-  cout << "Total Deadtime of the Instrument: " << m_StripsTotalDeadtime << endl;
+  cout << "Total dead time of the instrument: " << m_StripsTotalDeadtime << endl;
   cout << "Livetime fraction: " << 1-(m_StripsTotalDeadtime/(m_LastTime-m_FirstTime)) << endl;
-  cout << "Avg Deadtime per Hit: " << m_StripsTotalDeadtime/m_TotalHitsBeforeDeadtime << endl;
+  cout << "Hits erased due to detector being dead: " << m_StripHitsErased << endl;
+  cout << "Avg deadtime per strip hit: " << m_StripsTotalDeadtime/m_TotalStripHitsCounter << endl;
   cout << "Trigger rates (events per second)" << endl;
   for (int i=0; i<nDets; i++){
     cout << i << ":\t" << m_TriggerRates[i]/(m_LastTime-m_FirstTime) << endl;
   }
-  for(int i=0; i<nShieldPanels; i++){
-    cout << "Shield Panel "<< i << " dead time: " << m_ShieldDeadtime[i] << endl;
-  }
-  cout << "Hits erased due to detector being dead: " << m_StripHitsErased << endl;
+  cout << "###################" << endl << "END DEE STATISTICS" << endl << "###################" << endl;
+
   
   // cout << "Max buffer full index: " << m_MaxBufferFullIndex << '\t' << "Detector " << m_MaxBufferDetector << endl;
   
@@ -1837,7 +1873,7 @@ bool MDetectorEffectsEngineSingleDet::Finalize()
   // // End Plot
 
   // // Saves to csv ... Disable if not needed
-  // ofstream file("/Users/parshad/Software/Nuclearizer_outputs/Single_Det/Extracted/Cs137_singleDet_10x_noDT_1000Flux_100s_Parallel.csv");
+  // ofstream file("/Users/parshad/Software/Nuclearizer_outputs/UnitL_Deadtime/Extracted/Am241_STTC_L0+50Y_10s_97p9_noGRVeto.csv");
   // file << "Index, Strip ID, Times\n";
   // for (int i = 0; i<m_EventTimes.size(); i++) {
   //   file << i+1 << "," << m_EventStripIDs[i] << "," << m_EventTimes[i] << "\n";
@@ -1859,7 +1895,6 @@ bool MDetectorEffectsEngineSingleDet::Finalize()
   
   return true;
 }
-
 
 /////////////////////////////////////////////////////////////////////////////////
 //! Read in deadtime parameters file
