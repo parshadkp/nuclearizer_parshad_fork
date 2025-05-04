@@ -1530,8 +1530,8 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     for (int det=0; det<nDets; det++) {
       // Calculates deadtime after each merged strip hit list.
       for (int ASIC=0; ASIC<nASICs; ASIC++) {
-        CountRate(m_ASICHitStripID[det][ASIC], evt_time); // Counter for hits including NN
-        m_ASICHitStripID[det][ASIC].clear(); // Counter for hits including NN
+        CountRate(m_ASICHitStripID_DT[det][ASIC], evt_time); // Counter for hits including NN
+        m_ASICHitStripID_DT[det][ASIC].clear(); // Counter for hits including NN
         if (!IsGeDDead) {
           m_ASICDeadTime[det][ASIC] = dTimeASICs(m_ASICHitStripID[det][ASIC]);
           if (m_ASICDeadTime[det][ASIC] > m_StripsCurrentDeadtime) {
