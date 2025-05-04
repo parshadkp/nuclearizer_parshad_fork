@@ -391,7 +391,7 @@
    unsigned long m_ChargeLossCounter;
    unsigned long m_NumShieldHitCounts;
    unsigned long m_ShieldVetoCounter;
-   
+   unsigned long m_RawStripCounts;
    
    //! Strip Delay for ENABLE to fall
    double m_StripCoincidenceWindow;

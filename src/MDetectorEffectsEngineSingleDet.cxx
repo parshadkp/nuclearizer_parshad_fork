@@ -239,6 +239,7 @@ bool MDetectorEffectsEngineSingleDet::Initialize()
   m_IsShieldDead = false;
   m_NumShieldHitCounts = 0;
   m_ShieldVetoCounter = 0;
+  m_RawStripCounts = 0;
   
   // initialize constants for charge sharing due to diffusion
   double k = 1.38e-16; //Boltzmann's constant
@@ -575,7 +576,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       }
       // Sets the detector ID for different hits. May need to change if there is a change in naming convention
       // Seems like there are many hits with error "***  Error  ***  Named detector not found:"
-      
+      m_RawStripCounts += 1;
       DetectorName.RemoveAllInPlace("D");
       int DetectorID = DetectorName.ToInt()-1;
       
@@ -1899,6 +1900,7 @@ bool MDetectorEffectsEngineSingleDet::Finalize()
   cout << "Shield rate after deadtime (cps): " << (m_NumShieldHitCounts-m_NumBGOHitsErased)/(m_LastTime-m_FirstTime) << endl;
   
   cout << "###################" << endl << "Strips" << endl << "###################" << endl;
+  cout << "Raw strip hits from cosima: " << m_RawStripCounts << endl;
   cout << "Total strip hits before deadtime: " << m_TotalStripHitsCounter << endl;
   // cout << "Hits in Detector with name: " <<  DetectorName << endl;
   cout << "Number of events with multiple hits per strip: " << m_MultipleHitsCounter << endl;
@@ -1950,7 +1952,7 @@ bool MDetectorEffectsEngineSingleDet::Finalize()
   // // End Plot
 
   // // Saves to csv ... Disable if not needed
-  // ofstream file("/Users/parshad/Software/Nuclearizer_outputs/UnitL_Deadtime/Extracted/Am241_STTC_L0+50Y_10s_97p9_ActiveNN_DT.csv");
+  // ofstream file("/Users/parshad/Software/Nuclearizer_outputs/UnitL_Deadtime/Extracted/Ba133_STTC_L0+35Y_10s_50p2_noGRVeto_ActiveNN_DT.csv");
   // file << "Index, Strip ID, Times\n";
   // for (int i = 0; i<m_EventTimes.size(); i++) {
   //   file << i+1 << "," << m_EventStripIDs[i] << "," << m_EventTimes[i] << "\n";
