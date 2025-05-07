@@ -81,7 +81,10 @@ void MStripHit::Clear()
   m_ADCUnits = 0;
   m_Energy = 0;
   m_EnergyResolution = 0;
+  m_TAC = 0;
+  m_TACResolution = 0;
   m_Timing = 0;
+  m_TimingResolution = 0;
   m_PreampTemp = 0;
   m_Origins.clear();
 }
@@ -107,7 +110,7 @@ bool MStripHit::Parse(MString& Line, int Version)
 																			&energy,
 																			&energy_res);
 		SetDetectorID(det_id);
-		pos_strip == 'p' ? IsPositiveStrip(true) : IsPositiveStrip(false);
+		pos_strip == 'p' ? IsLowVoltageStrip(true) : IsLowVoltageStrip(false);
 		SetStripID(strip_id);
 		has_triggered == 0 ? HasTriggered(false) : HasTriggered(true);
 		SetTiming((double)timing);
@@ -125,7 +128,7 @@ bool MStripHit::Parse(MString& Line, int Version)
   vector<MString> tokens = Line.Tokenize(" ");
   if( tokens.size() >= 10 ){
 	  SetDetectorID(tokens.at(1).ToInt());
-	  tokens.at(2) == "p" ? IsPositiveStrip(true) : IsPositiveStrip(false);
+	  tokens.at(2) == "p" ? IsLowVoltageStrip(true) : IsLowVoltageStrip(false);
 	  SetStripID(tokens.at(3).ToInt());
 	  tokens.at(4) == "0" ? HasTriggered(false) : HasTriggered(true);
 	  SetTiming( tokens.at(5).ToDouble() );
@@ -190,7 +193,7 @@ void MStripHit::StreamRoa(ostream& S)
    <<m_ReadOutElement->GetStripID()<<" "
    <<((m_ReadOutElement->IsLowVoltageStrip() == true) ? "l" : "h")<<" "
    <<m_ADCUnits<<" "
-   <<m_Timing<<" "
+   <<m_TAC<<" "
    <<m_PreampTemp<<" ";
   for (unsigned int i = 0; i < m_Origins.size(); ++i) {
     if (i != 0) S<<";";

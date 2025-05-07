@@ -1,8 +1,8 @@
 /*
- * MDetectorEffectEngineSMEX.cxx
+ * MDetectorEffectsEngineSMEX.cxx
  *
  *
- * Copyright (C) by Clio Sleator, Carolyn Kierans, Andreas Zoglauer.
+ * Copyright (C) by Clio Sleator, Carolyn Kierans, Andreas Zoglauer, Parshad Patel.
  * All rights reserved.
  *
  *
@@ -105,19 +105,6 @@ MDetectorEffectsEngineSMEX::~MDetectorEffectsEngineSMEX()
   for (auto& C: m_ResolutionCalibration) {
     delete C.second;
   }
-  
-  // automaytically deleted
-  //for (auto& C: m_FSTThresholds) {
-  //  delete C.second;
-  //}
-  
-  //for (auto& V1: m_ChargeSharingFactors) {
-  //  for (auto& V2: V1) {
-  //    delete V2; 
-  //  }
-  //}
-  
-  //delete m_ChargeLossHist;
 }
 
 
@@ -165,9 +152,17 @@ bool MDetectorEffectsEngineSMEX::Initialize()
   //load crosstalk coefficients
   if (ParseCrosstalkFile() == false) return false;
   
+  // //initialize dead time and trigger rates
+  // for (int i=0; i<nASICs; i++){
+  //   m_ASICDeadTime[i] = 0; m_TotalDeadTime[i] = 0.; m_TriggerRates[i]=0;
+  //   for (int j=0; j<nDTBuffSlots; j++){
+  //     m_DeadTimeBuffer[i][j] = -1;
+  //   }
+  // }
+
   //initialize dead time and trigger rates
   for (int i=0; i<nDets; i++){
-    m_CCDeadTime[i] = 0; m_TotalDeadTime[i] = 0.; m_TriggerRates[i]=0;
+    m_ASICDeadTime[i] = 0; m_TotalDeadTime[i] = 0.; m_TriggerRates[i]=0;
     for (int j=0; j<nDTBuffSlots; j++){
       m_DeadTimeBuffer[i][j] = -1;
     }
@@ -229,14 +224,29 @@ bool MDetectorEffectsEngineSMEX::Initialize()
 
   // for shield veto: shield pulse duration and card cage delay: constant for now
   m_ShieldThreshold = 80.;
-  m_ShieldPulseDuration = 1.7e-6;
-  m_CCDelay = 700.e-9;
-  m_ShieldDelay = 900.e-9; //this is just a guess based on when veto window occurs!
-  m_ShieldVetoWindowSize = 0.4e-6;
+  m_ShieldPulseDuration = 1.5e-6;  // From measurements this seems to be ~1.5 us (is this energy dependent?)
+  // m_CCDelay = 700.e-9; // Card cage delay, not used now.
+  m_StripDelay = 500e-9;
+  m_StripDeadTime = 1e-6;
+  m_ShieldDelayBefore = 300e-9; // SCB delay before an event is read out
+  m_ShieldDelayAfter = 200e-9; // SCB delay before and after an event
+  m_ShieldDelay = m_ShieldDelayBefore + m_ShieldDelayAfter;
+  m_ShieldVetoWindowSize = 0.4e-6; // Shield veto window size, unchanged from SMEX.
+  m_ASICDeadTimePerChannel = 1e-6;
+  activated1 = 0;
+  activated2 = 0;
+  activated3 = 0;
   // for shield veto: gets updated with shield event times
   // start at -10s so that it doesn't veto beginning events by accident
   m_ShieldTime = -10;
-  m_ShieldDeadTime = 0;
+  m_LastGoodHitShieldTime = m_ShieldTime;
+  m_ShieldDeadTime1 = 1.5e-6;
+  m_ShieldDeadTime2 = 1.5e-6;
+  m_ShieldDeadTime3 = 1.5e-6;
+  m_TotalShieldDeadTime1 = 0;
+  m_TotalShieldDeadTime2 = 0;
+  m_TotalShieldDeadTime3 = 0;
+
   
   m_IsShieldDead = false;
   
@@ -275,13 +285,67 @@ bool MDetectorEffectsEngineSMEX::Initialize()
   return true;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+//!Function to define deadtime
+double MDetectorEffectsEngineSMEX::dTimeShields(int detectors_activated){
+  double asic_deadtime = 1e-6;
+  double shield_decayTime = 1.5e-6;
+  double delayTimeBefore = 300e-9;
+  double delayTimeAfter = 200e-9;
+
+  double shields_deadtime = detectors_activated * asic_deadtime;
+  if (shield_decayTime > shields_deadtime) {
+      shields_deadtime += (shield_decayTime - shields_deadtime);
+  }
+  shields_deadtime += delayTimeBefore + delayTimeAfter;
+  return shields_deadtime;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
 
+///////////////////////////////////////////////////////////////////////////////
+
+//! Function to define asic deadtime
+// ** Needs more work **
+// Check if there are neighboring channels. Count the channels only once. The channel map needs to be sorted. 
+// Channels needs to be checked to be within delay time window.
+double MDetectorEffectsEngineSMEX::dTimeGeDs(vector<int> channels) {
+    // Enable line is shared for 4 asics per detector, two per side.
+    // Only called if one channel is activated.
+
+    double GeD_deadtime = 0;
+    int temp = 0;
+    int channelNext = 0;
+    int highestCountNear = 0;
+    double waitTime = 400e-9;
+    double asic_deadtime = 1e-6;
+    int channels_activated_count = 1;
+    vector<int>::iterator channels_activated;
+    // int count_near = 1;
+    // int channels_activated = channels.size();
+    sort(channels.begin(), channels.end());
+    channels_activated = unique(channels.begin(), channels.end());
+    channels.resize(distance(channels.begin(), channels_activated));
+    channels_activated_count = channels.size();
+
+    if (channels_activated_count < 32) {
+      GeD_deadtime = waitTime + (channels_activated_count*asic_deadtime);
+    }
+    else {
+      GeD_deadtime = waitTime + (channels_activated_count*asic_deadtime)+(asic_deadtime*2);
+    }
+
+    return GeD_deadtime;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 //! Analyze whatever needs to be analyzed...
-bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
-{
+bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event) {
+
   MSimEvent* SimEvent = nullptr;
   //int RunningID = 0;
   
@@ -289,7 +353,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
     
     //cout<<endl<<endl<<"ID: "<<SimEvent->GetID()<<endl;
     
-    // Always update the number of simulated events, since for that nu,ber it doesn't matter if the event passes or not
+    // Always update the number of simulated events, since for that number it doesn't matter if the event passes or not
     m_NumberOfSimulatedEvents = SimEvent->GetSimulationEventID();
     
     
@@ -316,37 +380,204 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
     double evt_time = SimEvent->GetTime().GetAsSeconds();
     bool hasDetHits = false;
     bool hasShieldHits = false;
-    bool increaseShieldDeadTime = false;
+    bool increaseShieldDeadTime1 = false;
+    bool increaseShieldDeadTime2 = false;
+    bool increaseShieldDeadTime3 = false;
+    m_IsShieldDead = false;
     
-    // first check if there's another shield hit above the threshold
-    // if so, veto event
+    // // first check if there's another shield hit above the threshold
+    // // if so, veto event
+    // for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){
+    //   MSimHT* HT = SimEvent->GetHTAt(h);
+    //   if (HT->GetDetectorType() == 4) {
+    //     MDVolumeSequence* VS = HT->GetVolumeSequence();
+    //     MDDetector* Detector = VS->GetDetector();
+    //     MString DetName = Detector->GetName();
+        
+    //     //ONLY veto CsI shields, NOT NaI for polarization calibration
+    //     if (DetName.GetSubString(0,6) == "Shield"){
+          
+    //       double energy = HT->GetEnergy();
+    //       energy = NoiseShieldEnergy(energy,DetName);
+    //       HT->SetEnergy(energy);
+          
+    //       if (energy > m_ShieldThreshold) {
+    //         if (m_ShieldTime + m_ShieldVetoWindowSize < evt_time){ hasShieldHits = true; }
+    //         increaseShieldDeadTime = true;
+    //         //this is handling paralyzable dead time
+    //         m_ShieldTime = evt_time;
+    //       }
+    //     }
+    //     else if (HT->GetDetectorType() == 3){ hasDetHits = true; }
+    //   }
+    // }
+
+    // Need to update deadtime for the current detector if there is an another shield that read out an event. 
+    // Shields are paired so that Det 1, 2 are read using 1 ASIC and so forth. This is actually 4 BGOs per ASIC.
+    // This will change in the future when more detectors are added. Need to change the ShieldVetoWindowSize add to something more realistic.
     for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){
+      increaseShieldDeadTime1 = false;
+      increaseShieldDeadTime2 = false;
+      increaseShieldDeadTime3 = false;        
       MSimHT* HT = SimEvent->GetHTAt(h);
       if (HT->GetDetectorType() == 4) {
         MDVolumeSequence* VS = HT->GetVolumeSequence();
         MDDetector* Detector = VS->GetDetector();
         MString DetName = Detector->GetName();
-        
-        //ONLY veto CsI shields, NOT NaI for polarization calibration
         if (DetName.GetSubString(0,6) == "Shield"){
-          
+          int DetNum = atoi(DetName.GetSubString(6,7));
           double energy = HT->GetEnergy();
           energy = NoiseShieldEnergy(energy,DetName);
           HT->SetEnergy(energy);
-          
-          if (energy > m_ShieldThreshold) {
-            if (m_ShieldTime + m_ShieldVetoWindowSize < evt_time){ hasShieldHits = true; }
-            increaseShieldDeadTime = true;
-            //this is handling paralyzable dead time
-            m_ShieldTime = evt_time;
+          switch(DetNum){
+            case 1 :
+              if ((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+                activated1 += 1;
+                increaseShieldDeadTime1 = true;
+                m_ShieldTime = evt_time;
+                hasShieldHits = true;
+                m_IsShieldDead = false;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 > evt_time)){
+                m_IsShieldDead = true;
+                // activated1 = 1;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 < evt_time)){
+                m_ShieldDeadTime1 = 1.5e-6;
+                hasShieldHits = true;
+                m_LastGoodHitShieldTime = evt_time;
+                m_ShieldTime = evt_time;
+                activated1 = 1;
+                m_IsShieldDead = false;
+              }
+              break;
+            case 2 :
+              if ((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+                activated1 += 1;
+                increaseShieldDeadTime1 = true;
+                m_ShieldTime = evt_time;
+                hasShieldHits = true;
+                m_IsShieldDead = false;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 > evt_time)){
+                m_IsShieldDead = true;
+                // activated1 = 1;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime1 < evt_time)){
+                m_ShieldDeadTime1 = 1.5e-6;
+                hasShieldHits = true;
+                m_LastGoodHitShieldTime = evt_time;
+                m_ShieldTime = evt_time;
+                activated1 = 1;
+                m_IsShieldDead = false;
+              }
+              break;
+            case 3 :
+              if ((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+                activated2 += 1;
+                increaseShieldDeadTime2 = true;
+                m_ShieldTime = evt_time;
+                hasShieldHits = true;
+                m_IsShieldDead = false;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 > evt_time)){
+                m_IsShieldDead = true;
+                // activated1 = 1;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 < evt_time)){
+                m_ShieldDeadTime2 = 1.5e-6;
+                hasShieldHits = true;
+                m_LastGoodHitShieldTime = evt_time;
+                m_ShieldTime = evt_time;
+                activated2 = 1;
+                m_IsShieldDead = false;
+              }
+              break;
+            case 4 :
+              if ((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+                activated2 += 1;
+                increaseShieldDeadTime2 = true;
+                m_ShieldTime = evt_time;
+                hasShieldHits = true;
+                m_IsShieldDead = false;
+
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 > evt_time)){
+                m_IsShieldDead = true;
+                // activated1 = 1;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime2 < evt_time)){
+                m_ShieldDeadTime2 = 1.5e-6;
+                hasShieldHits = true;
+                m_LastGoodHitShieldTime = evt_time;
+                m_ShieldTime = evt_time;
+                activated2 = 1;
+                m_IsShieldDead = false;
+              }
+              break;
+            case 5 :
+              if ((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+                activated3 += 1;
+                increaseShieldDeadTime3 = true;
+                m_ShieldTime = evt_time;
+                hasShieldHits = true;
+                m_IsShieldDead = false;
+
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 > evt_time)){
+                m_IsShieldDead = true;
+                // activated1 = 1;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 < evt_time)){
+                m_ShieldDeadTime3 = 1.5e-6;
+                hasShieldHits = true;
+                m_LastGoodHitShieldTime = evt_time;
+                m_ShieldTime = evt_time;
+                activated3 = 1;
+                m_IsShieldDead = false;
+              }
+              break;
+            case 6 :
+              if ((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDelayBefore > evt_time)){
+                activated3 += 1;
+                increaseShieldDeadTime3 = true;
+                m_ShieldTime = evt_time;
+                hasShieldHits = true;
+                m_IsShieldDead = false;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 > evt_time)){
+                m_IsShieldDead = true;
+                // activated1 = 1;
+              }
+              else if((energy > m_ShieldThreshold) && (m_LastGoodHitShieldTime + m_ShieldDeadTime3 < evt_time)){
+                m_ShieldDeadTime3 = 1.5e-6;
+                hasShieldHits = true;
+                m_LastGoodHitShieldTime = evt_time;
+                m_ShieldTime = evt_time;
+                activated3 = 1;
+                m_IsShieldDead = false;
+              }
+              break;
+            }
           }
         }
         else if (HT->GetDetectorType() == 3){ hasDetHits = true; }
       }
-    }
+    
     
     if (hasShieldHits == true){ m_NumShieldCounts++; }
-    if (increaseShieldDeadTime == true){ m_ShieldDeadTime += m_ShieldPulseDuration; }
+    if (increaseShieldDeadTime1 == true){ 
+      m_ShieldDeadTime1 = dTimeShields(activated1); 
+      m_TotalShieldDeadTime1 += m_ShieldDeadTime1;
+    }
+    if (increaseShieldDeadTime2 == true){ 
+      m_ShieldDeadTime2 = dTimeShields(activated2); 
+      m_TotalShieldDeadTime2 += m_ShieldDeadTime2;
+    }
+    if (increaseShieldDeadTime3 == true){ 
+      m_ShieldDeadTime3 = dTimeShields(activated3); 
+      m_TotalShieldDeadTime3 += m_ShieldDeadTime3;
+    }
     
     // //3 cases to veto events:
     // //(1) shield active starts in veto window
@@ -367,16 +598,27 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
     //(2) shield active ends in veto window
     //(3) shield active during the entire veto window
     //this if statement could perhaps be condensed but I'm less confused this way
-    if ((m_ShieldTime + m_ShieldDelay > evt_time + m_CCDelay && m_ShieldTime + m_ShieldDelay < evt_time + m_CCDelay + m_ShieldVetoWindowSize) || 
-      (m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_CCDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_CCDelay + m_ShieldVetoWindowSize) || 
-      (m_ShieldTime + m_ShieldDelay < evt_time + m_CCDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_CCDelay + m_ShieldVetoWindowSize)){
-      // 		  delete SimEvent;
-      //      continue;
-      //don't delete the event yet: need to apply dead time to the card cage first!
+    // if ((m_ShieldTime + m_ShieldDelay > evt_time + m_StripDelay && m_ShieldTime + m_ShieldDelay < evt_time + m_StripDelay + m_ShieldVetoWindowSize) || 
+    //   (m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_StripDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_StripDelay + m_ShieldVetoWindowSize) || 
+    //   (m_ShieldTime + m_ShieldDelay < evt_time + m_StripDelay && m_ShieldTime + m_ShieldDelay + m_ShieldPulseDuration > evt_time + m_StripDelay + m_ShieldVetoWindowSize)){
+    //   // 		  delete SimEvent;
+    //   //      continue;
+    //   //don't delete the event yet: need to apply dead time to the card cage first!
+    //   m_ShieldVeto = true;
+    //   }
+    //   else { m_ShieldVeto = false; }
+    if (m_IsShieldDead) {
       m_ShieldVeto = true;
-      }
-      else { m_ShieldVeto = false; }
-      
+    }
+    else {m_ShieldVeto = false;}
+    
+    // for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){ 
+    //   MSimHT* HT = SimEvent->GetHTAt(h);
+    //   if (HT->GetDetectorType() == 3) {
+        
+    //   }
+    // }
+
       //get interactions to look for ionization in hits
       vector<MSimIA*> IAs;
       for (unsigned int i=0; i<SimEvent->GetNIAs(); i++){
@@ -428,8 +670,8 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
         pSide.m_OppositeStrip = nSide.m_ID;
         nSide.m_OppositeStrip = pSide.m_ID;
         
-        pSide.m_ROE.IsPositiveStrip(true);
-        nSide.m_ROE.IsPositiveStrip(false);
+        pSide.m_ROE.IsLowVoltageStrip(true);
+        nSide.m_ROE.IsLowVoltageStrip(false);
         
         // Convert detector name in detector ID
         pSide.m_ROE.SetDetectorID(DetectorID);
@@ -466,6 +708,8 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
         pSide.m_Energy = HT->GetEnergy();
         nSide.m_Energy = HT->GetEnergy();
         
+        //cout<<"Set energy: "<<HT->GetEnergy()<<endl;
+
         //m_EnergyOrig will be unchanged: to see if event is incompletely absorbed or not
         //(m_Energy is changed due to crosstalk and charge loss, etc)
         pSide.m_EnergyOrig = HT->GetEnergy();
@@ -500,7 +744,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
         double energyDeposited = 0.;
         double totalEnergyFromIAs = 0.;
         
-        for (unsigned int o=0; o<Origins.size(); o++){
+        for (unsigned int o = 0; o < Origins.size(); o++){
           int iaID = Origins[o];
           //for some reason Origin[o] is 0 when the IAs aren't saved,
           //which makes the code crash unless I do this
@@ -726,6 +970,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
         for (auto P: pStripsEnergies) {
           //change the energy of original strip
           if (pSide.m_ROE.GetStripID() == P.first){
+            //cout<<"pSide: "<<P.second<<endl;
             pSide.m_Energy = P.second;
             pSide.m_EnergyOrig = P.second;
             pOrigHit = true;
@@ -734,7 +979,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
           //guard ring hit
           else if (P.first == 38){
             MDEEStripHit chargeShareGRHit;
-            chargeShareGRHit.m_ROE.IsPositiveStrip(true);
+            chargeShareGRHit.m_ROE.IsLowVoltageStrip(true);
             chargeShareGRHit.m_ROE.SetDetectorID(pSide.m_ROE.GetDetectorID());
             chargeShareGRHit.m_ROE.SetStripID(38);
             chargeShareGRHit.m_Energy = P.second;
@@ -744,10 +989,11 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
           //normal strip hit
           else {
             MDEEStripHit chargeShareStrip;
-            chargeShareStrip.m_ROE.IsPositiveStrip(true);
+            chargeShareStrip.m_ROE.IsLowVoltageStrip(true);
             chargeShareStrip.m_ROE.SetStripID(P.first);
             chargeShareStrip.m_ROE.SetDetectorID(pSide.m_ROE.GetDetectorID());
             chargeShareStrip.m_Timing = pSide.m_Timing;
+            //cout<<"chargeShareStrip: "<<P.second<<endl;
             chargeShareStrip.m_Energy = P.second;
             chargeShareStrip.m_EnergyOrig = P.second;
             chargeShareStrip.m_Depth = pSide.m_Depth;
@@ -766,7 +1012,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
           }
           else if (N.first == 38){
             MDEEStripHit chargeShareGRHit;
-            chargeShareGRHit.m_ROE.IsPositiveStrip(false);
+            chargeShareGRHit.m_ROE.IsLowVoltageStrip(false);
             chargeShareGRHit.m_ROE.SetDetectorID(nSide.m_ROE.GetDetectorID());
             chargeShareGRHit.m_ROE.SetStripID(38);
             chargeShareGRHit.m_Energy = N.second;
@@ -775,7 +1021,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
           }
           else {
             MDEEStripHit chargeShareStrip;
-            chargeShareStrip.m_ROE.IsPositiveStrip(false);
+            chargeShareStrip.m_ROE.IsLowVoltageStrip(false);
             chargeShareStrip.m_ROE.SetStripID(N.first);
             chargeShareStrip.m_ROE.SetDetectorID(nSide.m_ROE.GetDetectorID());
             chargeShareStrip.m_Timing = nSide.m_Timing;
@@ -795,17 +1041,48 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
         m_TotalHitsCounter++;
         
       }
-      
+    
+    // Check if event if within delay time window and add the channel activated to the channel list. 
+    // Need to group channels by asic and make different channel vectors for each ASIC.
+    // Call dTimeGeDs when all channels are done in one ASIC.
+
+      // for (unsigned int h=0; h<SimEvent->GetNHTs(); h++){     
+      //   MSimHT* HT = SimEvent->GetHTAt(h);
+      //   if (HT->GetDetectorType() == 3) {
+      //     if (evt_time > m_ShieldTime) {}
+      //   }
+      // }
+
+
+      //delete event and update deadtime if the event was vetoed by the shields
+      //can't do this earlier because need to know which detectors got hit
+      // if (m_ShieldVeto){
+      //   for (int i=0; i<nASICs; i++){
+      //     for (int det=0; det<nDets; det++){
+      //       if (detectorsHitForShieldVeto[det] == 1){
+      //       //make sure CC not already dead
+      //         if (evt_time > m_LastHitTimeByDet[det] + m_ASICDeadTime[i]){
+      //           m_ASICDeadTime[i] = 1e-6;
+      //           m_LastHitTimeByDet[det] = evt_time;
+      //           m_TotalDeadTime[det] += m_ASICDeadTime[i];
+      //         }
+      //       }
+      //     }
+      //   }
+      //   delete SimEvent;
+      //   continue;
+      // }
+
       //delete event and update deadtime if the event was vetoed by the shields
       //can't do this earlier because need to know which detectors got hit
       if (m_ShieldVeto){
         for (int det=0; det<nDets; det++){
           if (detectorsHitForShieldVeto[det] == 1){
             //make sure CC not already dead
-            if (evt_time > m_LastHitTimeByDet[det] + m_CCDeadTime[det]){
-              m_CCDeadTime[det] = 1e-5;
+            if (evt_time > m_LastHitTimeByDet[det] + m_ASICDeadTime[det]){
+              m_ASICDeadTime[det] = 1e-6;
               m_LastHitTimeByDet[det] = evt_time;
-              m_TotalDeadTime[det] += m_CCDeadTime[det];
+              m_TotalDeadTime[det] += m_ASICDeadTime[det];
             }
           }
         }
@@ -826,14 +1103,14 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
         int DetectorID = DetectorName.ToInt();
         
         MDEEStripHit GuardRingHitP;
-        GuardRingHitP.m_ROE.IsPositiveStrip(true);
+        GuardRingHitP.m_ROE.IsLowVoltageStrip(true);
         GuardRingHitP.m_ROE.SetDetectorID(DetectorID);
         GuardRingHitP.m_ROE.SetStripID(38); // ?
         GuardRingHitP.m_Energy = GR->GetEnergy();
         GuardRingHitP.m_Position = MVector(0, 0, 0); // <-- not important
         
         MDEEStripHit GuardRingHitN;
-        GuardRingHitN.m_ROE.IsPositiveStrip(false);
+        GuardRingHitN.m_ROE.IsLowVoltageStrip(false);
         GuardRingHitN.m_ROE.SetDetectorID(DetectorID);
         GuardRingHitN.m_ROE.SetStripID(38); // ?
         GuardRingHitN.m_Energy = GR->GetEnergy();
@@ -961,6 +1238,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
           EnergyOrig += SubHit.m_EnergyOrig;
         }
         
+        //cout<<"Merged energy: "<<Energy<<endl;
         Hit.m_Energy = Energy;
         Hit.m_EnergyOrig = EnergyOrig;
       }
@@ -978,8 +1256,8 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
           int stripID2 = (*sh2).m_ROE.GetStripID();
           int detID1 = (*sh1).m_ROE.GetDetectorID();
           int detID2 = (*sh2).m_ROE.GetDetectorID();
-          bool side1 = (*sh1).m_ROE.IsPositiveStrip();
-          bool side2 = (*sh2).m_ROE.IsPositiveStrip();
+          bool side1 = (*sh1).m_ROE.IsLowVoltageStrip();
+          bool side2 = (*sh2).m_ROE.IsLowVoltageStrip();
           if (abs(stripID1-stripID2) == 1 && side1 == side2 && detID1 == detID2){
             adjacent = true;
           }
@@ -1004,6 +1282,8 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
             double depth1 = (*sh1).m_Depth;
             double depth2 = (*sh2).m_Depth;
             if (side1 && depth1 == depth2){
+
+              //cout<<energy1<<":"<<energy2<<endl;
               vector<double> newEnergies = ApplyChargeLoss(energy1,energy2,detID1,0,depth1,depth2);
               (*sh1).m_Energy = newEnergies.at(0);
               (*sh2).m_Energy = newEnergies.at(1);
@@ -1022,7 +1302,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
       int i2 = 0;
       while (i != MergedStripHits.end()) {
         int sdet = (*i).m_ROE.GetDetectorID();
-        bool bside = (*i).m_ROE.IsPositiveStrip();
+        bool bside = (*i).m_ROE.IsLowVoltageStrip();
         int sside = 0;
         if (bside == true) {sside = 1;}
         int sstrip = (*i).m_ROE.GetStripID();
@@ -1034,6 +1314,8 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
         sim_arr[i2][3] = sstrip;
         sim_arr[i2][4] = senergy;
         
+        //cout<<"Energy: "<<senergy<<endl;
+
         ++i;
         ++i2;
       }
@@ -1126,7 +1408,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
       while (j != MergedStripHits.end()) {
         int det = (*j).m_ROE.GetDetectorID();
         int stripID = (*j).m_ROE.GetStripID();
-        bool side_b = (*j).m_ROE.IsPositiveStrip();
+        bool side_b = (*j).m_ROE.IsLowVoltageStrip();
         int side = 0;
         if (side_b) {side = 1;}
         
@@ -1149,10 +1431,11 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
         if (m_LLDThresholds.count((*k).m_ROE) == 0){
           ROE_map_key.SetDetectorID(12);
           ROE_map_key.SetStripID(0);
-          ROE_map_key.IsPositiveStrip(0);
+          ROE_map_key.IsLowVoltageStrip(0);
         }
         
         if ((*k).m_ADC < m_LLDThresholds[ROE_map_key]) {
+          //cout<<(*k).m_ADC<<" < "<<m_LLDThresholds[ROE_map_key]<<endl;
           k = MergedStripHits.erase(k);
         } else {
           double prob = m_Random.Rndm();
@@ -1163,6 +1446,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
         }
       }
       
+
       
       // (4c) Take care of guard ring vetoes
       list<MDEEStripHit>::iterator gr = GuardRingHits.begin();
@@ -1186,10 +1470,10 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
       for (int det=0; det<nDets; det++){
         if (grHit[det] == 1){
           //make sure CC not already dead
-          if (evt_time > m_LastHitTimeByDet[det] + m_CCDeadTime[det]){
-            m_CCDeadTime[det] = 1e-5;
+          if (evt_time > m_LastHitTimeByDet[det] + m_ASICDeadTime[det]){
+            m_ASICDeadTime[det] = 1e-6;
             m_LastHitTimeByDet[det] = evt_time;
-            m_TotalDeadTime[det] += m_CCDeadTime[det];
+            m_TotalDeadTime[det] += m_ASICDeadTime[det];
           }
         }
       }
@@ -1205,7 +1489,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
       while (tr != MergedStripHits.end()) {
         int DetID = (*tr).m_ROE.GetDetectorID();
         if ((*tr).m_Timing != 0){
-          if ((*tr).m_ROE.IsPositiveStrip()){ xExists[DetID] = 1; }
+          if ((*tr).m_ROE.IsLowVoltageStrip()){ xExists[DetID] = 1; }
           else{ yExists[DetID] = 1; }
         }
         ++tr;
@@ -1226,10 +1510,10 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
       for (int det=0; det<nDets; det++){
         if ((xExists[det] == 0 && yExists[det] == 1) || (xExists[det] == 1 && yExists[det] == 0)){
           //make sure CC not already dead
-          if (evt_time > m_LastHitTimeByDet[det] + m_CCDeadTime[det]){
-            m_CCDeadTime[det] = 1e-5;
+          if (evt_time > m_LastHitTimeByDet[det] + m_ASICDeadTime[det]){
+            m_ASICDeadTime[det] = 1e-6;
             m_LastHitTimeByDet[det] = evt_time;
-            m_TotalDeadTime[det] += m_CCDeadTime[det];
+            m_TotalDeadTime[det] += m_ASICDeadTime[det];
           }
         }
       }
@@ -1259,19 +1543,19 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
   }
   */
 
-      if (MergedStripHits.size() == 0){
-        cout<<"Nothing left before 6.5"<<endl;
-      }
+//       if (MergedStripHits.size() == 0){
+//        cout<<"Nothing left before 6.5"<<endl;
+//      }
       
       
       //Step (6.5): Dead time
-      //figure out which detectors are currently dead -- 10us dead time per event
+      //figure out which detectors are currently dead -- deadtime depends on how many channels were activated.
       vector<int> updateLastHitTime = vector<int>(nDets,0);
       vector<int> detIsDead = vector<int>(nDets,0);
       
       for (int d=0; d<nDets; d++){
         //second conditional for running multiple sim files when t starts at 0
-        if (m_LastHitTimeByDet[d] + m_CCDeadTime[d] > evt_time && m_LastHitTimeByDet[d]<evt_time){ detIsDead[d] = 1; }
+        if (m_LastHitTimeByDet[d] + m_ASICDeadTime[d] > evt_time && m_LastHitTimeByDet[d]<evt_time){ detIsDead[d] = 1; }
       }
       
       //erase strip hits in dead detectors
@@ -1292,8 +1576,8 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
       for (int d=0; d<nDets; d++){
         if (updateLastHitTime[d] == 1){
           m_LastHitTimeByDet[d] = evt_time;
-          m_CCDeadTime[d] = 1e-5;
-          m_TotalDeadTime[d] += m_CCDeadTime[d];
+          m_ASICDeadTime[d] = 1e-6;
+          m_TotalDeadTime[d] += m_ASICDeadTime[d];
         }
       }
       
@@ -1424,7 +1708,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
           double initialEnergy = SimEvent->GetIAById(initIA)->GetSecondaryEnergy();
           double finalEnergy = 0.0;
           for (list<MDEEStripHit>::iterator p=MergedStripHits.begin(); p!=MergedStripHits.end(); ++p){
-            if ((*p).m_ROE.IsPositiveStrip() == false && (*p).m_HitIndex == h){
+            if ((*p).m_ROE.IsLowVoltageStrip() == false && (*p).m_HitIndex == h){
               finalEnergy += (*p).m_EnergyOrig;
             }
           }
@@ -1480,7 +1764,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
         // Sum up all energies:
         double TotalMeasuredEnergy = 0.0;
         for (list<MDEEStripHit>::iterator p = MergedStripHits.begin(); p != MergedStripHits.end(); ++p){
-          if ((*p).m_ROE.IsPositiveStrip() == false) {
+          if ((*p).m_ROE.IsLowVoltageStrip() == false) {
             TotalMeasuredEnergy += (*p).m_EnergyOrig;
           }
         }
@@ -1512,17 +1796,20 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
 
       } // End photo peak fudge factor
       
-      
+      //cout<<"Check is events left"<<endl;
+
       // Check if there are any strips left
       if (MergedStripHits.size() == 0){
         delete SimEvent;
         continue;
       }
+
+      //cout<<"yes"<<endl;
       
       double finalEventEnergy = 0;
       int nNStripHits = 0;
       for (MDEEStripHit Hit: MergedStripHits){
-        if (!Hit.m_ROE.IsPositiveStrip()){
+        if (!Hit.m_ROE.IsLowVoltageStrip()){
           finalEventEnergy += Hit.m_Energy;
           nNStripHits++;
         }
@@ -1535,7 +1822,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
         }
         cout << "DEE STRIP HITS: " << endl;
         for (MDEEStripHit Hit: MergedStripHits){
-          if (!Hit.m_ROE.IsPositiveStrip()){
+          if (!Hit.m_ROE.IsLowVoltageStrip()){
             cout << Hit.m_Energy << endl;
           }
         }
@@ -1554,7 +1841,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
         MStripHit* SH = new MStripHit();
         SH->SetDetectorID(Hit.m_ROE.GetDetectorID());
         SH->SetStripID(Hit.m_ROE.GetStripID());
-        SH->IsXStrip(Hit.m_ROE.IsPositiveStrip());
+        SH->IsXStrip(Hit.m_ROE.IsLowVoltageStrip());
         SH->SetADCUnits(Hit.m_ADC);
         SH->SetTiming(Hit.m_Timing);
         SH->SetPreampTemp(20);
@@ -1574,7 +1861,7 @@ bool MDetectorEffectsEngineSMEX::GetNextEvent(MReadOutAssembly* Event)
           m_Roa<<IAs[i]->ToSimString()<<endl;
         }
         for (MDEEStripHit Hit: MergedStripHits){
-          m_Roa<<"UH "<<Hit.m_ROE.GetDetectorID()<<" "<<Hit.m_ROE.GetStripID()<<" "<<(Hit.m_ROE.IsPositiveStrip() ? "p" : "n")<<" "<<Hit.m_ADC<<" "<<Hit.m_Timing<<" "<<Hit.m_PreampTemp;
+          m_Roa<<"UH "<<Hit.m_ROE.GetDetectorID()<<" "<<Hit.m_ROE.GetStripID()<<" "<<(Hit.m_ROE.IsLowVoltageStrip() ? "p" : "n")<<" "<<Hit.m_ADC<<" "<<Hit.m_Timing<<" "<<Hit.m_PreampTemp;
           
           MString Origins;
           for (int Origin: Hit.m_Origins) {
@@ -1624,7 +1911,10 @@ bool MDetectorEffectsEngineSMEX::Finalize()
   for (int i=0; i<nDets; i++){
     cout << i << ":\t" << m_TriggerRates[i]/(m_LastTime-m_FirstTime) << endl;
   }
-  cout << "Shield dead time: " << m_ShieldDeadTime << endl;
+  cout << "Total shield dead time for group 1: " << m_TotalShieldDeadTime1 << endl;
+  cout << "Total shield dead time for group 2: " << m_TotalShieldDeadTime2 << endl;
+  cout << "Total shield dead time for group 3: " << m_TotalShieldDeadTime3 << endl;
+  // cout << "Total shield dead time for all shields:" << m_TotalShieldDeadTime << endl;
   
   cout << "Max buffer full index: " << m_MaxBufferFullIndex << '\t' << "Detector " << m_MaxBufferDetector << endl;
   
@@ -1663,7 +1953,7 @@ int MDetectorEffectsEngineSMEX::EnergyToADC(MDEEStripHit& Hit, double mean_energ
   
   //get energy from gaussian around mean_energy with sigma=EnergyResolution
   //TRandom3 r(0);
-  double energy = m_Random.Gaus(mean_energy,EnergyResolutionFWHM/2.35);
+   double energy = m_Random.Gaus(mean_energy,EnergyResolutionFWHM/2.35);
   //	double energy = mean_energy; 
   //  spectrum->Fill(energy);
   
@@ -1727,18 +2017,17 @@ double MDetectorEffectsEngineSMEX::NoiseShieldEnergy(double energy, MString shie
 ////////////////////////////////////////////////////////////////////////////////
 
 //! Calculate new summed energy of two strips affected by charge loss
-vector<double> MDetectorEffectsEngineSMEX::ApplyChargeLoss(double energy1, double energy2, int detID, int side, double depth1, double depth2)
-{
+vector<double> MDetectorEffectsEngineSMEX::ApplyChargeLoss(double energy1, double energy2, int detID, int side, double depth1, double depth2) 
+{  
   vector<double> retEnergy;
   if (energy1 == 0 && energy2 == 0) {
     retEnergy.push_back(0);
     retEnergy.push_back(0);
     return retEnergy;
   }
-  
   double trueSum = energy1+energy2;
   double diff = abs(energy1-energy2);
-  
+
   //deal with depth
   //use average depth? or don't do charge loss if hits dont have the same depth?
   //	double Depth = (depth1+depth2)/2.;
@@ -1771,7 +2060,6 @@ vector<double> MDetectorEffectsEngineSMEX::ApplyChargeLoss(double energy1, doubl
   newE2 = energy2 - sumDiff/2.;
   
   m_ChargeLossHist->Fill(trueSum,sumDiff);
-  
   // vector<double> retEnergy;
   
   retEnergy.push_back(newE1);
@@ -1933,7 +2221,7 @@ bool MDetectorEffectsEngineSMEX::ParseGuardRingThresholdFile()
     MReadOutElementDoubleStrip R;
     R.SetDetectorID(detector);
     R.SetStripID(38);
-    R.IsPositiveStrip(side);
+    R.IsLowVoltageStrip(side);
     
     m_GuardRingThresholds[R] = threshold;
   }
@@ -1974,7 +2262,7 @@ bool MDetectorEffectsEngineSMEX::ParseThresholdFile()
     MReadOutElementDoubleStrip R;
     R.SetDetectorID(det);
     R.SetStripID(strip);
-    R.IsPositiveStrip(isPos);
+    R.IsLowVoltageStrip(isPos);
     
     double lldThresh = Parser.GetTokenizerAt(i)->GetTokenAtAsDouble(1);
     double functionMax = Parser.GetTokenizerAt(i)->GetTokenAtAsDouble(6);
@@ -2009,7 +2297,7 @@ bool MDetectorEffectsEngineSMEX::ParseThresholdFile()
   MReadOutElementDoubleStrip R;
   R.SetDetectorID(12);
   R.SetStripID(0);
-  R.IsPositiveStrip(0);
+  R.IsLowVoltageStrip(0);
   
   m_LLDThresholds[R] = lldAvg;
   
@@ -2053,7 +2341,7 @@ bool MDetectorEffectsEngineSMEX::ParseEnergyCalibrationFile()
         MReadOutElementDoubleStrip R;
         R.SetDetectorID(Parser.GetTokenizerAt(i)->GetTokenAtAsUnsignedInt(2));
         R.SetStripID(Parser.GetTokenizerAt(i)->GetTokenAtAsUnsignedInt(3));
-        R.IsPositiveStrip(Parser.GetTokenizerAt(i)->GetTokenAtAsString(4) == "p");
+        R.IsLowVoltageStrip(Parser.GetTokenizerAt(i)->GetTokenAtAsString(4) == "p");
         
         if (Parser.GetTokenizerAt(i)->IsTokenAt(0,"CM") == true) {
           CM_ROEToLine[R] = i;
@@ -2205,3 +2493,4 @@ void MDetectorEffectsEngineSMEX::dummy_func(){
 
 // MDummy.cxx: the end...
 ////////////////////////////////////////////////////////////////////////////////
+

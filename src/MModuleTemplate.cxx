@@ -75,6 +75,7 @@ MModuleTemplate::MModuleTemplate() : MModule()
   AddModuleType(MAssembly::c_EventReconstruction);
 
   // Set all modules, which can follow this module
+  AddSucceedingModuleType(MAssembly::c_NoRestriction);
 
   // Set if this module has an options GUI
   // Overwrite ShowOptionsGUI() with the call to the GUI!
@@ -100,7 +101,7 @@ bool MModuleTemplate::Initialize()
 {
   // Initialize the module 
 
-  return true;
+  return MModule::Initialize();
 }
 
 
@@ -118,13 +119,26 @@ bool MModuleTemplate::AnalyzeEvent(MReadOutAssembly* Event)
 ////////////////////////////////////////////////////////////////////////////////
 
 
+void MModuleTemplate::Finalize()
+{
+  // Finalize the analysis - do all cleanup, i.e., undo Initialize() 
+
+  MModule::Finalize();
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+
 void MModuleTemplate::ShowOptionsGUI()
 {
   //! Show the options GUI --- has to be overwritten!
 
+  /*
   MGUIOptionsTemplate* Options = new MGUIOptionsTemplate(this);
   Options->Create();
   gClient->WaitForUnmap(Options);
+  */
 }
 
 

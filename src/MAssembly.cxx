@@ -57,21 +57,29 @@ using namespace std;
 #include "MGUIExpoCombinedViewer.h"
 #include "MModuleTransmitterRealta.h"
 
-#include "MModuleLoaderSimulationsBalloon.h"
+// #include "MModuleLoaderSimulationsBalloon.h"
 #include "MModuleLoaderSimulationsSMEX.h"
+#include "MModuleLoaderSimulationsSingleDet.h"
 #include "MModuleLoaderMeasurementsROA.h"
-#include "MModuleReceiverBalloon.h"
-#include "MModuleLoaderMeasurementsBinary.h"
+// #include "MModuleReceiverBalloon.h"
+// #include "MModuleLoaderMeasurementsBinary.h"
 #include "MModuleEnergyCalibration.h"
 #include "MModuleEnergyCalibrationUniversal.h"
 #include "MModuleCrosstalkCorrection.h"
 #include "MModuleChargeSharingCorrection.h"
 #include "MModuleDepthCalibration.h"
 #include "MModuleDepthCalibrationB.h"
+#include "MModuleDepthCalibration2024.h"
 #include "MModuleStripPairingGreedy.h"
+#include "MModuleStripPairingChiSquare.h"
 #include "MModuleEventFilter.h"
 #include "MModuleEventSaver.h"
 #include "MModuleResponseGenerator.h"
+
+#include "MModuleTACcut.h"
+
+#include "MModuleDiagnostics.h"
+#include "MModuleDiagnosticsEnergyPerStrip.h"
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -105,25 +113,32 @@ MAssembly::MAssembly()
   
   m_Supervisor->UseMultiThreading(true);
   
-  m_Supervisor->AddAvailableModule(new MModuleLoaderSimulationsBalloon());
+  // m_Supervisor->AddAvailableModule(new MModuleLoaderSimulationsBalloon());
   m_Supervisor->AddAvailableModule(new MModuleLoaderSimulationsSMEX());
+  m_Supervisor->AddAvailableModule(new MModuleLoaderSimulationsSingleDet());
   m_Supervisor->AddAvailableModule(new MModuleLoaderMeasurementsROA());
-  m_Supervisor->AddAvailableModule(new MModuleReceiverBalloon());
-  m_Supervisor->AddAvailableModule(new MModuleLoaderMeasurementsBinary());
+  // m_Supervisor->AddAvailableModule(new MModuleReceiverBalloon());
+  // m_Supervisor->AddAvailableModule(new MModuleLoaderMeasurementsBinary());
   
   m_Supervisor->AddAvailableModule(new MModuleEventFilter());
   m_Supervisor->AddAvailableModule(new MModuleEnergyCalibrationUniversal());
 
   m_Supervisor->AddAvailableModule(new MModuleStripPairingGreedy());
+  m_Supervisor->AddAvailableModule(new MModuleStripPairingChiSquare());
   m_Supervisor->AddAvailableModule(new MModuleChargeSharingCorrection());
   m_Supervisor->AddAvailableModule(new MModuleDepthCalibration());
   m_Supervisor->AddAvailableModule(new MModuleDepthCalibrationB());
+  m_Supervisor->AddAvailableModule(new MModuleDepthCalibration2024());
 
   m_Supervisor->AddAvailableModule(new MModuleCrosstalkCorrection());  
   
   m_Supervisor->AddAvailableModule(new MModuleEventSaver());
   m_Supervisor->AddAvailableModule(new MModuleTransmitterRealta());
   m_Supervisor->AddAvailableModule(new MModuleResponseGenerator());
+  m_Supervisor->AddAvailableModule(new MModuleTACcut());
+
+  m_Supervisor->AddAvailableModule(new MModuleDiagnostics());
+  m_Supervisor->AddAvailableModule(new MModuleDiagnosticsEnergyPerStrip());
 
   m_Supervisor->Load();
   

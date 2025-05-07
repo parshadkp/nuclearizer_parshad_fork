@@ -74,6 +74,7 @@ MModuleEnergyCalibrationUniversal::MModuleEnergyCalibrationUniversal() : MModule
   
   // Set all modules, which have to be done before this module
   AddPreceedingModuleType(MAssembly::c_EventLoader);
+  AddPreceedingModuleType(MAssembly::c_TACcut);
   
   // Set all types this modules handles
   AddModuleType(MAssembly::c_EnergyCalibration);
@@ -155,7 +156,7 @@ bool MModuleEnergyCalibrationUniversal::Initialize()
         MReadOutElementDoubleStrip R;
         R.SetDetectorID(Parser.GetTokenizerAt(i)->GetTokenAtAsUnsignedInt(2));
         R.SetStripID(Parser.GetTokenizerAt(i)->GetTokenAtAsUnsignedInt(3));
-        R.IsPositiveStrip(Parser.GetTokenizerAt(i)->GetTokenAtAsString(4) == "p");
+        R.IsLowVoltageStrip((Parser.GetTokenizerAt(i)->GetTokenAtAsString(4) == "p") || (Parser.GetTokenizerAt(i)->GetTokenAtAsString(4) == "l"));
         if (Parser.GetTokenizerAt(i)->IsTokenAt(0, "CP") == true) {
           CP_ROEToLine[R] = i;
         } else if (Parser.GetTokenizerAt(i)->IsTokenAt(0, "CM") == true) {
@@ -179,7 +180,7 @@ bool MModuleEnergyCalibrationUniversal::Initialize()
           MReadOutElementDoubleStrip R;
           R.SetDetectorID(Parser_Temp.GetTokenizerAt(i)->GetTokenAtAsUnsignedInt(2));
           R.SetStripID(Parser_Temp.GetTokenizerAt(i)->GetTokenAtAsUnsignedInt(3));
-          R.IsPositiveStrip(Parser_Temp.GetTokenizerAt(i)->GetTokenAtAsUnsignedInt(4) == 1);
+          R.IsLowVoltageStrip(Parser_Temp.GetTokenizerAt(i)->GetTokenAtAsUnsignedInt(4) == 1);
           CT_ROEToLine[R] = i;
         }
       }
@@ -390,15 +391,28 @@ bool MModuleEnergyCalibrationUniversal::AnalyzeEvent(MReadOutAssembly* Event)
         double EnergyResolution = FitRes->Eval(Energy);
         SH->SetEnergyResolution(EnergyResolution);
       }
-      if (R.IsPositiveStrip() == true) {
+      if (R.IsLowVoltageStrip() == true) {
         if (HasExpos() == true) {
           m_ExpoEnergyCalibration->AddEnergy(Energy);
         }
       }
       
       if (g_Verbosity >= c_Info) cout<<m_XmlTag<<": Energy: "<<SH->GetADCUnits()<<" adu --> "<<Energy<<" keV"<<endl;
-    } 
-  } 
+    }
+  }
+
+  for (unsigned int i = 0; i < Event->GetNStripHits(); ) {
+    MStripHit* SH = Event->GetStripHit(i);
+    if (SH->GetEnergy() < 8) {
+      // cout<<"HACK: Removing strip hit due to TAC "<<SH->GetTiming()<<" cut or energy "<<SH->GetEnergy()<<endl;
+      Event->RemoveStripHit(i);
+      delete SH;
+    } else {
+      ++i;
+    }
+  }
+
+
   Event->SetAnalysisProgress(MAssembly::c_EnergyCalibration);
   
   return true;

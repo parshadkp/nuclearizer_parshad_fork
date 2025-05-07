@@ -59,7 +59,6 @@ class MModuleTemplate : public MModule
   //! Create an XML node tree from the configuration
   virtual MXmlNode* CreateXmlConfiguration();
 
-
   // protected methods:
  protected:
 
