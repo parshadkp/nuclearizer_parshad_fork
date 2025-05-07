@@ -392,6 +392,7 @@
    unsigned long m_NumShieldHitCounts;
    unsigned long m_ShieldVetoCounter;
    unsigned long m_RawStripCounts;
+   unsigned long TestCounter;
    
    
    //! Strip Delay for ENABLE to fall

@@ -240,6 +240,7 @@ bool MDetectorEffectsEngineSingleDet::Initialize()
   m_NumShieldHitCounts = 0;
   m_ShieldVetoCounter = 0;
   m_RawStripCounts = 0;
+  TestCounter = 0;
   
   // initialize constants for charge sharing due to diffusion
   double k = 1.38e-16; //Boltzmann's constant
@@ -401,6 +402,8 @@ bool MDetectorEffectsEngineSingleDet::CountRate(vector<int> ASICChannels, double
       m_EventTimes.push_back(CountTime);
     }
   }
+
+  
 
   return true;
 
@@ -576,7 +579,6 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       }
       // Sets the detector ID for different hits. May need to change if there is a change in naming convention
       // Seems like there are many hits with error "***  Error  ***  Named detector not found:"
-      m_RawStripCounts += 1;
       DetectorName.RemoveAllInPlace("D");
       int DetectorID = DetectorName.ToInt()-1;
       
@@ -966,7 +968,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       if (pOrigHit){ StripHits.push_back(pSide); }
       if (nOrigHit){ StripHits.push_back(nSide); }
       
-      m_TotalStripHitsCounter++;
+      m_RawStripCounts++;
       
     }
     
@@ -1408,48 +1410,6 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     }
     
 
-    // // Checking for deadtime implementation by checking without it
-    // list<MDEEStripHit>::iterator i = MergedStripHits.begin();
-    // int ASICofDet = 5;
-    // int det = 500;
-    // while (i != MergedStripHits.end()) {
-    //   ASICofDet = 5;
-    //   det = (*i).m_ROE.GetDetectorID();
-
-    //   if ((*i).m_ROE.GetStripID() == 64) {
-    //     cout << "Strip is 64; should not happen." << endl;
-    //     continue;
-    //   }
-    //   else if ((*i).m_ROE.IsLowVoltageStrip() && (*i).m_ROE.GetStripID() <= 31 && (*i).m_ROE.GetStripID() >= 0) {
-    //     ASICofDet = 0;
-    //   }
-    //   else if ((*i).m_ROE.IsLowVoltageStrip() && (*i).m_ROE.GetStripID() <= 63 && (*i).m_ROE.GetStripID() >= 32) {
-    //     ASICofDet = 1;
-    //   }
-    //   else if ((!(*i).m_ROE.IsLowVoltageStrip()) && (*i).m_ROE.GetStripID() <= 31 && (*i).m_ROE.GetStripID() >= 0) {
-    //     ASICofDet = 2;
-    //   }
-    //   else if ((!(*i).m_ROE.IsLowVoltageStrip()) && (*i).m_ROE.GetStripID() <= 63 && (*i).m_ROE.GetStripID() >= 32) {
-    //     ASICofDet = 3;
-    //   }
-    //   m_ASICHitStripID_noDT[det][ASICofDet].push_back((*i).m_ROE.GetStripID());
-    //   // m_EventStripIDs.push_back((*a).m_ROE.GetStripID());
-    //   // m_EventTimes.push_back(evt_time);
-    //   // m_EventStripEnergy.push_back((*a).m_Energy);
-    //   // m_EventStripADC.push_back((*a).m_ADC);
-    //   i++;
-    // }
-    // for (int det=0; det<nDets; det++) {
-    //   // Adds to counts after each merged strip hit list.
-    //   for (int ASIC=0; ASIC<nASICs; ASIC++) {
-    //     CountRate(m_ASICHitStripID_noDT[det][ASIC], evt_time);
-    //     // clear the original lists
-    //     m_ASICHitStripID_noDT[det][ASIC].clear();
-    //   }
-    // }
-    
-
-
     // //// Deadtime implementation (ASICs read out hits in parallel but have a shared Enable line)
     // //Step (5): Dead time
 
@@ -1467,6 +1427,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
 
     while (i != MergedStripHits.end()) {
       // go through each merged strip hit list and add strip ids to a list of strips that are read out in parallel.
+      m_TotalStripHitsCounter++;
       det = (*i).m_ROE.GetDetectorID();
       ASICofDet = 5;
 
@@ -1497,6 +1458,9 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
         // clear the original lists
         for (int det=0; det<nDets; det++) {
           for (int ASIC=0; ASIC<nASICs; ASIC++) {
+            CountRate(m_ASICHitStripID[det][ASIC], evt_time); // Counter for hits including NN
+            // CountRate(m_ASICHitStripID_noDT[det][ASIC], evt_time); // Counter for non deadtime including NN
+            m_ASICHitStripID_noDT[det][ASIC].clear(); // Counter for hits including NN
             m_ASICHitStripID[det][ASIC].clear();
           }
         }
@@ -1504,17 +1468,20 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
         ASICFirstHitAfterDead = true;
         m_ASICLastHitTime = evt_time;
         m_ASICHitStripID[det][ASICofDet].push_back((*i).m_ROE.GetStripID());
-        m_ASICHitStripID_DT[det][ASICofDet].push_back((*i).m_ROE.GetStripID()); // Counter for hits including NN
+        m_ASICHitStripID_noDT[det][ASICofDet].push_back((*i).m_ROE.GetStripID());
+        // m_ASICHitStripID_DT[det][ASICofDet].push_back((*i).m_ROE.GetStripID()); // Counter for hits including NN
       }
 
       else if (m_ASICLastHitTime + m_StripCoincidenceWindow > evt_time) {
         // Event occured within coincidence window so append all strip IDs
         m_ASICHitStripID[det][ASICofDet].push_back((*i).m_ROE.GetStripID());
-        m_ASICHitStripID_DT[det][ASICofDet].push_back((*i).m_ROE.GetStripID()); // Counter for hits including NN
+        m_ASICHitStripID_noDT[det][ASICofDet].push_back((*i).m_ROE.GetStripID());
+        // m_ASICHitStripID_DT[det][ASICofDet].push_back((*i).m_ROE.GetStripID()); // Counter for hits including NN
       }
 
       else if (m_ASICLastHitTime + m_StripsCurrentDeadtime > evt_time) {
         // Event occured within deadtime
+        m_ASICHitStripID_noDT[det][ASICofDet].push_back((*i).m_ROE.GetStripID());
         IsGeDDead = true;
         m_StripHitsErased += 1;
         i = MergedStripHits.erase(i);
@@ -1531,8 +1498,6 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     for (int det=0; det<nDets; det++) {
       // Calculates deadtime after each merged strip hit list.
       for (int ASIC=0; ASIC<nASICs; ASIC++) {
-        CountRate(m_ASICHitStripID_DT[det][ASIC], evt_time); // Counter for hits including NN
-        m_ASICHitStripID_DT[det][ASIC].clear(); // Counter for hits including NN
         if (!IsGeDDead) {
           m_ASICDeadTime[det][ASIC] = dTimeASICs(m_ASICHitStripID[det][ASIC]);
           if (m_ASICDeadTime[det][ASIC] > m_StripsCurrentDeadtime) {
@@ -1653,6 +1618,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     // Step (6): 
     
     //update trigger rates
+    // Currently only adds once per MergedStripHit ...
     set<int> detectorsHit;
     list<MDEEStripHit>::iterator TR = MergedStripHits.begin();
     while (TR != MergedStripHits.end()) {
@@ -1662,6 +1628,7 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
     }
     
     for (set<int>::iterator s=detectorsHit.begin(); s!=detectorsHit.end(); ++s){
+      // TestCounter += 1;
       int detID = *s;
       m_TriggerRates[detID] += 1;
     }
@@ -1671,7 +1638,6 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       m_FirstTime = SimEvent->GetTime().GetAsSeconds();
     }
     m_LastTime = SimEvent->GetTime().GetAsSeconds();
-    
 
     // Step (7): Apply fudge factor to completely absorbed events (photopeak)
     //to deal with successor stuff, need to do this for each SimHT
@@ -1901,20 +1867,21 @@ bool MDetectorEffectsEngineSingleDet::Finalize()
   
   cout << "###################" << endl << "Strips" << endl << "###################" << endl;
   cout << "Raw strip hits from cosima: " << m_RawStripCounts << endl;
-  cout << "Total strip hits before deadtime: " << m_TotalStripHitsCounter << endl;
+  cout << "Total strip hits after charge sharing (before deadtime): " << m_TotalStripHitsCounter << endl;
   // cout << "Hits in Detector with name: " <<  DetectorName << endl;
   cout << "Number of events with multiple hits per strip: " << m_MultipleHitsCounter << endl;
   cout << "Charge loss applies counter: " << m_ChargeLossCounter << endl;
   cout << "Guard Ring hits: " << m_countGR << endl;
-  cout << "Dead time " << endl;
+  // cout << "Dead time " << endl;
   cout << "Total dead time of the instrument: " << m_StripsTotalDeadtime << endl;
   cout << "Livetime fraction: " << 1-(m_StripsTotalDeadtime/(m_LastTime-m_FirstTime)) << endl;
   cout << "Hits erased due to detector being dead: " << m_StripHitsErased << endl;
   cout << "Avg deadtime per strip hit: " << m_StripsTotalDeadtime/m_TotalStripHitsCounter << endl;
-  cout << "Trigger rates (events per second)" << endl;
+  cout << "Trigger rates (events per second, no NN)" << endl;
   for (int i=0; i<nDets; i++){
     cout << i << ":\t" << m_TriggerRates[i]/(m_LastTime-m_FirstTime) << endl;
   }
+  // cout << "Test counter: " << TestCounter << endl;
   cout << "###################" << endl << "END DEE STATISTICS" << endl << "###################" << endl;
 
   
@@ -1952,7 +1919,7 @@ bool MDetectorEffectsEngineSingleDet::Finalize()
   // // End Plot
 
   // // Saves to csv ... Disable if not needed
-  // ofstream file("/Users/parshad/Software/Nuclearizer_outputs/UnitL_Deadtime/Extracted/Ba133_STTC_L0+35Y_10s_50p2_noGRVeto_ActiveNN_DT.csv");
+  // ofstream file("/Users/parshad/Software/Nuclearizer_outputs/UnitL_Deadtime/Extracted/Am241_STTC_L0+35Y_10s_97p9_noGRVeto_ActiveNN.csv");
   // file << "Index, Strip ID, Times\n";
   // for (int i = 0; i<m_EventTimes.size(); i++) {
   //   file << i+1 << "," << m_EventStripIDs[i] << "," << m_EventTimes[i] << "\n";
