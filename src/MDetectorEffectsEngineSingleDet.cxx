@@ -1469,14 +1469,12 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
         m_ASICLastHitTime = evt_time;
         m_ASICHitStripID[det][ASICofDet].push_back((*i).m_ROE.GetStripID());
         m_ASICHitStripID_noDT[det][ASICofDet].push_back((*i).m_ROE.GetStripID());
-        // m_ASICHitStripID_DT[det][ASICofDet].push_back((*i).m_ROE.GetStripID()); // Counter for hits including NN
       }
 
       else if (m_ASICLastHitTime + m_StripCoincidenceWindow > evt_time) {
         // Event occured within coincidence window so append all strip IDs
         m_ASICHitStripID[det][ASICofDet].push_back((*i).m_ROE.GetStripID());
         m_ASICHitStripID_noDT[det][ASICofDet].push_back((*i).m_ROE.GetStripID());
-        // m_ASICHitStripID_DT[det][ASICofDet].push_back((*i).m_ROE.GetStripID()); // Counter for hits including NN
       }
 
       else if (m_ASICLastHitTime + m_StripsCurrentDeadtime > evt_time) {

@@ -346,8 +346,6 @@
    vector<vector<vector<int> > > m_ASICHitStripID = vector<vector<vector<int> > >(nDets, vector<vector<int>>(nASICs));
    //! Helper Strip ID vector to count for hits without deadtime
    vector<vector<vector<int>>> m_ASICHitStripID_noDT = vector<vector<vector<int> > >(nDets, vector<vector<int>>(nASICs));
-   //! Helper Strip ID vector to count for hits with deadtime
-   vector<vector<vector<int>>> m_ASICHitStripID_DT = vector<vector<vector<int> > >(nDets, vector<vector<int>>(nASICs));
    //! Stores total dead time of the instrument
    double m_StripsTotalDeadtime;
    //! Bool to store if ASIC is dead or not
