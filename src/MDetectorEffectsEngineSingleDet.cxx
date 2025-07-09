@@ -1401,25 +1401,25 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       }
       ++gr;
     }
-    list<MDEEStripHit>::iterator grVeto = MergedStripHits.begin();
-    while (grVeto != MergedStripHits.end()){
-      int detID = (*grVeto).m_ROE.GetDetectorID();
-      if (grHit[detID] == 1){ 
-        grVeto = MergedStripHits.erase(grVeto);
-      }
-      else{ ++grVeto; }
-    }
-    //update dead time stuff if the hit is vetoed by the guard ring
-    for (int det=0; det<nDets; det++){
-      if (grHit[det] == 1){
-        //make sure CC not already dead
-        if (!IsGeDDead){
-          m_StripsCurrentDeadtime = 2.8e-6;
-          m_ASICLastHitTime = evt_time;
-          m_StripsTotalDeadtime += m_StripsCurrentDeadtime;
-        }
-      }
-    }
+    // list<MDEEStripHit>::iterator grVeto = MergedStripHits.begin();
+    // while (grVeto != MergedStripHits.end()){
+    //   int detID = (*grVeto).m_ROE.GetDetectorID();
+    //   if (grHit[detID] == 1){ 
+    //     grVeto = MergedStripHits.erase(grVeto);
+    //   }
+    //   else{ ++grVeto; }
+    // }
+    // //update dead time stuff if the hit is vetoed by the guard ring
+    // for (int det=0; det<nDets; det++){
+    //   if (grHit[det] == 1){
+    //     //make sure CC not already dead
+    //     if (!IsGeDDead){
+    //       m_StripsCurrentDeadtime = 2.8e-6;
+    //       m_ASICLastHitTime = evt_time;
+    //       m_StripsTotalDeadtime += m_StripsCurrentDeadtime;
+    //     }
+    //   }
+    // }
     
 
     // //// Deadtime implementation (ASICs read out hits in parallel but have a shared Enable line)
@@ -1470,8 +1470,8 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
         // clear the original lists
         for (int det=0; det<nDets; det++) {
           for (int ASIC=0; ASIC<nASICs; ASIC++) {
-            CountRate(m_ASICHitStripID[det][ASIC], m_TempEvtTimes[det][ASIC]); // Counter for hits including NN
-            // CountRate(m_ASICHitStripID_noDT[det][ASIC], evt_time); // Counter for non deadtime including NN
+            // CountRate(m_ASICHitStripID[det][ASIC], m_TempEvtTimes[det][ASIC]); // Counter for hits including NN
+            CountRate(m_ASICHitStripID_noDT[det][ASIC], m_TempEvtTimes[det][ASIC]); // Counter for non-deadtime including NN
             m_ASICHitStripID_noDT[det][ASIC].clear(); // Counter for hits including NN
             m_ASICHitStripID[det][ASIC].clear();
             m_TempEvtTimes[det][ASIC].clear();
@@ -1494,7 +1494,8 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
 
       else if (m_ASICLastHitTime + m_StripsCurrentDeadtime > evt_time) {
         // Event occured within deadtime
-        m_ASICHitStripID_noDT[det][ASICofDet].push_back((*i).m_ROE.GetStripID());
+        m_ASICHitStripID_noDT[det][ASICofDet].push_back((*i).m_ROE.GetStripID()); // remove for deadtime hits
+        m_TempEvtTimes[det][ASICofDet].push_back(evt_time); // remove for deadtime hits
         IsGeDDead = true;
         m_StripHitsErased += 1;
         i = MergedStripHits.erase(i);
@@ -1904,26 +1905,26 @@ bool MDetectorEffectsEngineSingleDet::Finalize()
   // cout<<"Ratio of events with ADC overflows: "<<(m_NumberOfEventsWithADCOverflows > 0 ? double(m_NumberOfEventsWithADCOverflows) / (m_NumberOfEventsWithADCOverflows + m_NumberOfEventsWithNoADCOverflows): 0)<<endl;
   // cout<<"Ratio of failed IA searches for charge sharing: "<<(m_NumberOfFailedIASearches > 0 ? double(m_NumberOfFailedIASearches) / (m_NumberOfFailedIASearches + m_NumberOfSuccessfulIASearches): 0)<<endl;
 
-  // Create a sample plot here -- maybe save the data as well ...
-  // Plots a light curve of all hits
-  TCanvas *canvas2 = new TCanvas("c2", "My Canvas 2", 800, 600);
-  TH1F *hist = new TH1F("hist", "Sample Histogram", (1e-3/1e-7), 0, 1e-3);
-  for (int i = 0; i<(m_EventTimes.size()-1); i++) {
-    if (m_EventTimes[i+1] != m_EventTimes[i]) {
-      double dT = m_EventTimes[i+1] - m_EventTimes[i];
-      // cout << "dT: " << dT << endl;
-      hist->Fill(dT);
-    }
-   }
+  // // Create a sample plot here -- maybe save the data as well ...
+  // // Plots a light curve of all hits
+  // TCanvas *canvas2 = new TCanvas("c2", "My Canvas 2", 800, 600);
+  // TH1F *hist = new TH1F("hist", "Sample Histogram", (1e-3/1e-7), 0, 1e-3);
+  // for (int i = 0; i<(m_EventTimes.size()-1); i++) {
+  //   if (m_EventTimes[i+1] != m_EventTimes[i]) {
+  //     double dT = m_EventTimes[i+1] - m_EventTimes[i];
+  //     // cout << "dT: " << dT << endl;
+  //     hist->Fill(dT);
+  //   }
+  //  }
 
-  hist->SetTitle("Time between events (s) vs Counts");
-  hist->GetXaxis()->SetTitle("Time between events (s)");
-  hist->GetYaxis()->SetTitle("Counts");
+  // hist->SetTitle("Time between events (s) vs Counts");
+  // hist->GetXaxis()->SetTitle("Time between events (s)");
+  // hist->GetYaxis()->SetTitle("Counts");
 
-  hist->Draw();
-  canvas2->Draw();
-  // // canvas->SaveAs("/Users/parshad/Software/canvas.png");
-  // // End Plot
+  // hist->Draw();
+  // canvas2->Draw();
+  // // // canvas->SaveAs("/Users/parshad/Software/canvas.png");
+  // // // End Plot
 
   // // Plots a ADC vs Energy of all hits
   // TCanvas *canvas = new TCanvas("c1", "My Canvas", 800, 600);
@@ -1935,13 +1936,13 @@ bool MDetectorEffectsEngineSingleDet::Finalize()
   // canvas->Draw();
   // // End Plot
 
-  // // Saves to csv ... Disable if not needed
-  // ofstream file("/Users/parshad/Software/Nuclearizer_outputs/UnitL_Deadtime/Extracted/Am241_STTC_L0+35Y_10s_97p9_noGRVeto_ActiveNN.csv");
-  // file << "Index, Strip ID, Times\n";
-  // for (int i = 0; i<m_EventTimes.size(); i++) {
-  //   file << i+1 << "," << m_EventStripIDs[i] << "," << m_EventTimes[i] << "\n";
-  // }
-  // file.close();
+  // Saves to csv ... Disable if not needed
+  ofstream file("/Users/parshad/Software/Nuclearizer_outputs/UnitL_Deadtime/Extracted/cosi-lbl-hp52432-1/Am241_STTC_L0+17p145Y_10s_102p47_noGRVeto_ActiveNN_noDT.csv");
+  file << "Index, Strip ID, Times\n";
+  for (int i = 0; i<m_EventTimes.size(); i++) {
+    file << i+1 << "," << m_EventStripIDs[i] << "," << m_EventTimes[i] << "\n";
+  }
+  file.close();
 
   m_EventTimes.clear();
   m_EventStripIDs.clear();
