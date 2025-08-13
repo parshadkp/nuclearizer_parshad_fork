@@ -1401,25 +1401,25 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
       }
       ++gr;
     }
-    // list<MDEEStripHit>::iterator grVeto = MergedStripHits.begin();
-    // while (grVeto != MergedStripHits.end()){
-    //   int detID = (*grVeto).m_ROE.GetDetectorID();
-    //   if (grHit[detID] == 1){ 
-    //     grVeto = MergedStripHits.erase(grVeto);
-    //   }
-    //   else{ ++grVeto; }
-    // }
-    // //update dead time stuff if the hit is vetoed by the guard ring
-    // for (int det=0; det<nDets; det++){
-    //   if (grHit[det] == 1){
-    //     //make sure CC not already dead
-    //     if (!IsGeDDead){
-    //       m_StripsCurrentDeadtime = 2.8e-6;
-    //       m_ASICLastHitTime = evt_time;
-    //       m_StripsTotalDeadtime += m_StripsCurrentDeadtime;
-    //     }
-    //   }
-    // }
+    list<MDEEStripHit>::iterator grVeto = MergedStripHits.begin();
+    while (grVeto != MergedStripHits.end()){
+      int detID = (*grVeto).m_ROE.GetDetectorID();
+      if (grHit[detID] == 1){ 
+        grVeto = MergedStripHits.erase(grVeto);
+      }
+      else{ ++grVeto; }
+    }
+    //update dead time stuff if the hit is vetoed by the guard ring
+    for (int det=0; det<nDets; det++){
+      if (grHit[det] == 1){
+        //make sure CC not already dead
+        if (!IsGeDDead){
+          m_StripsCurrentDeadtime = 2.8e-6;
+          m_ASICLastHitTime = evt_time;
+          m_StripsTotalDeadtime += m_StripsCurrentDeadtime;
+        }
+      }
+    }
     
 
     // //// Deadtime implementation (ASICs read out hits in parallel but have a shared Enable line)
@@ -1470,8 +1470,8 @@ bool MDetectorEffectsEngineSingleDet::GetNextEvent(MReadOutAssembly* Event)
         // clear the original lists
         for (int det=0; det<nDets; det++) {
           for (int ASIC=0; ASIC<nASICs; ASIC++) {
-            // CountRate(m_ASICHitStripID[det][ASIC], m_TempEvtTimes[det][ASIC]); // Counter for hits including NN
-            CountRate(m_ASICHitStripID_noDT[det][ASIC], m_TempEvtTimes[det][ASIC]); // Counter for non-deadtime including NN
+            CountRate(m_ASICHitStripID[det][ASIC], m_TempEvtTimes[det][ASIC]); // Counter for hits including NN
+            // CountRate(m_ASICHitStripID_noDT[det][ASIC], m_TempEvtTimes[det][ASIC]); // Counter for non-deadtime including NN
             m_ASICHitStripID_noDT[det][ASIC].clear(); // Counter for hits including NN
             m_ASICHitStripID[det][ASIC].clear();
             m_TempEvtTimes[det][ASIC].clear();
@@ -1936,13 +1936,13 @@ bool MDetectorEffectsEngineSingleDet::Finalize()
   // canvas->Draw();
   // // End Plot
 
-  // Saves to csv ... Disable if not needed
-  ofstream file("/Users/parshad/Software/Nuclearizer_outputs/UnitL_Deadtime/Extracted/cosi-lbl-hp52432-1/Am241_STTC_L0+17p145Y_10s_102p47_noGRVeto_ActiveNN_noDT.csv");
-  file << "Index, Strip ID, Times\n";
-  for (int i = 0; i<m_EventTimes.size(); i++) {
-    file << i+1 << "," << m_EventStripIDs[i] << "," << m_EventTimes[i] << "\n";
-  }
-  file.close();
+  // // Saves to csv ... Disable if not needed
+  // ofstream file("/Users/parshad/Software/Nuclearizer_outputs/UnitL_Deadtime/Extracted/cosi-lbl-hp52432-1/Am241_STTC_L0+17p145Y_10s_102p47_noGRVeto_ActiveNN_noDT.csv");
+  // file << "Index, Strip ID, Times\n";
+  // for (int i = 0; i<m_EventTimes.size(); i++) {
+  //   file << i+1 << "," << m_EventStripIDs[i] << "," << m_EventTimes[i] << "\n";
+  // }
+  // file.close();
 
   m_EventTimes.clear();
   m_EventStripIDs.clear();
