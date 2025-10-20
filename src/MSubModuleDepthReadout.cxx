@@ -1,5 +1,5 @@
 /*
- * MSubModuleTemplate.cxx
+ * MSubModuleDepthReadout.cxx
  *
  *
  * Copyright (C) by Andreas Zoglauer.
@@ -18,13 +18,13 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-// MSubModuleTemplate
+// MSubModuleDepthReadout
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 
 // Include the header:
-#include "MSubModuleTemplate.h"
+#include "MSubModuleDepthReadout.h"
 
 // Standard libs:
 
@@ -38,34 +38,34 @@
 
 
 #ifdef ___CLING___
-ClassImp(MSubModuleTemplate)
+ClassImp(MSubModuleDepthReadout)
 #endif
 
 
 ////////////////////////////////////////////////////////////////////////////////
 
 
-MSubModuleTemplate::MSubModuleTemplate() : MSubModule()
+MSubModuleDepthReadout::MSubModuleDepthReadout() : MSubModule()
 {
-  // Construct an instance of MSubModuleTemplate
+  // Construct an instance of MSubModuleDepthReadout
 
-
+  m_Name = "DEE depth readout module";
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////
 
 
-MSubModuleTemplate::~MSubModuleTemplate()
+MSubModuleDepthReadout::~MSubModuleDepthReadout()
 {
-  // Delete this instance of MSubModuleTemplate
+  // Delete this instance of MSubModuleDepthReadout
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////
 
 
-bool MSubModuleTemplate::Initialize()
+bool MSubModuleDepthReadout::Initialize()
 {
   // Initialize the module
 
@@ -76,7 +76,7 @@ bool MSubModuleTemplate::Initialize()
 ////////////////////////////////////////////////////////////////////////////////
 
 
-void MSubModuleTemplate::Clear()
+void MSubModuleDepthReadout::Clear()
 {
   // Clear for the next event
 
@@ -87,9 +87,25 @@ void MSubModuleTemplate::Clear()
 ////////////////////////////////////////////////////////////////////////////////
 
 
-bool MSubModuleTemplate::AnalyzeEvent(MReadOutAssembly* Event)
+bool MSubModuleDepthReadout::AnalyzeEvent(MReadOutAssembly* Event)
 {
   // Main data analysis routine, which updates the event to a new level 
+
+  // Dummy code
+  list<MDEEStripHit>& LVHits = Event->GetDEEStripHitLVListReference();
+  for (MDEEStripHit& SH: LVHits) {
+    if (SH.m_IsGuardRing == false) {
+      SH.m_TAC = 8000 + 2000*SH.m_SimulatedRelativeDepth;
+      if (SH.m_TAC > 16383) SH.m_TAC = 16383;
+    }
+  }
+  list<MDEEStripHit>& HVHits = Event->GetDEEStripHitHVListReference();
+  for (MDEEStripHit& SH: HVHits) {
+    if (SH.m_IsGuardRing == false) {
+      SH.m_TAC = 8000 + 2000*(1.0-SH.m_SimulatedRelativeDepth);
+      if (SH.m_TAC > 16383) SH.m_TAC = 16383;
+    }
+  }
 
   return true;
 }
@@ -98,7 +114,7 @@ bool MSubModuleTemplate::AnalyzeEvent(MReadOutAssembly* Event)
 ////////////////////////////////////////////////////////////////////////////////
 
 
-void MSubModuleTemplate::Finalize()
+void MSubModuleDepthReadout::Finalize()
 {
   // Finalize the analysis - do all cleanup, i.e., undo Initialize() 
 
@@ -109,7 +125,7 @@ void MSubModuleTemplate::Finalize()
 ////////////////////////////////////////////////////////////////////////////////
 
 
-bool MSubModuleTemplate::ReadXmlConfiguration(MXmlNode* Node)
+bool MSubModuleDepthReadout::ReadXmlConfiguration(MXmlNode* Node)
 {
   //! Read the configuration data from an XML node
 
@@ -127,11 +143,9 @@ bool MSubModuleTemplate::ReadXmlConfiguration(MXmlNode* Node)
 ////////////////////////////////////////////////////////////////////////////////
 
 
-MXmlNode* MSubModuleTemplate::CreateXmlConfiguration()
+MXmlNode* MSubModuleDepthReadout::CreateXmlConfiguration(MXmlNode* Node)
 {
   //! Create an XML node tree from the configuration
-
-  MXmlNode* Node = new MXmlNode(0, m_XmlTag);
   
   /*
   MXmlNode* SomeTagNode = new MXmlNode(Node, "SomeTag", "SomeValue");
@@ -141,5 +155,5 @@ MXmlNode* MSubModuleTemplate::CreateXmlConfiguration()
 }
 
 
-// MSubModuleTemplate.cxx: the end...
+// MSubModuleDepthReadout.cxx: the end...
 ////////////////////////////////////////////////////////////////////////////////

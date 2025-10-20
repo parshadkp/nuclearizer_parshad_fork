@@ -1,5 +1,5 @@
 /*
- * MSubModuleTemplate.cxx
+ * MSubModuleDEEOutput.cxx
  *
  *
  * Copyright (C) by Andreas Zoglauer.
@@ -18,13 +18,13 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-// MSubModuleTemplate
+// MSubModuleDEEOutput
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 
 // Include the header:
-#include "MSubModuleTemplate.h"
+#include "MSubModuleDEEOutput.h"
 
 // Standard libs:
 
@@ -33,39 +33,38 @@
 // MEGAlib libs:
 #include "MSubModule.h"
 
-
 ////////////////////////////////////////////////////////////////////////////////
 
 
 #ifdef ___CLING___
-ClassImp(MSubModuleTemplate)
+ClassImp(MSubModuleDEEOutput)
 #endif
 
 
 ////////////////////////////////////////////////////////////////////////////////
 
 
-MSubModuleTemplate::MSubModuleTemplate() : MSubModule()
+MSubModuleDEEOutput::MSubModuleDEEOutput() : MSubModule()
 {
-  // Construct an instance of MSubModuleTemplate
+  // Construct an instance of MSubModuleDEEOutput
 
-
+  m_Name = "DEE output module";
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////
 
 
-MSubModuleTemplate::~MSubModuleTemplate()
+MSubModuleDEEOutput::~MSubModuleDEEOutput()
 {
-  // Delete this instance of MSubModuleTemplate
+  // Delete this instance of MSubModuleDEEOutput
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////
 
 
-bool MSubModuleTemplate::Initialize()
+bool MSubModuleDEEOutput::Initialize()
 {
   // Initialize the module
 
@@ -76,7 +75,7 @@ bool MSubModuleTemplate::Initialize()
 ////////////////////////////////////////////////////////////////////////////////
 
 
-void MSubModuleTemplate::Clear()
+void MSubModuleDEEOutput::Clear()
 {
   // Clear for the next event
 
@@ -87,9 +86,20 @@ void MSubModuleTemplate::Clear()
 ////////////////////////////////////////////////////////////////////////////////
 
 
-bool MSubModuleTemplate::AnalyzeEvent(MReadOutAssembly* Event)
+bool MSubModuleDEEOutput::AnalyzeEvent(MReadOutAssembly* Event)
 {
   // Main data analysis routine, which updates the event to a new level 
+
+  // Convert the DEE strip hits to standard strip hits
+  list<MDEEStripHit>& LVHits = Event->GetDEEStripHitLVListReference();
+  for (MDEEStripHit& SH: LVHits) {
+    Event->AddStripHit(SH.Convert());
+  }
+  list<MDEEStripHit>& HVHits = Event->GetDEEStripHitHVListReference();
+  for (MDEEStripHit& SH: HVHits) {
+    Event->AddStripHit(SH.Convert());
+  }
+
 
   return true;
 }
@@ -98,7 +108,7 @@ bool MSubModuleTemplate::AnalyzeEvent(MReadOutAssembly* Event)
 ////////////////////////////////////////////////////////////////////////////////
 
 
-void MSubModuleTemplate::Finalize()
+void MSubModuleDEEOutput::Finalize()
 {
   // Finalize the analysis - do all cleanup, i.e., undo Initialize() 
 
@@ -109,7 +119,7 @@ void MSubModuleTemplate::Finalize()
 ////////////////////////////////////////////////////////////////////////////////
 
 
-bool MSubModuleTemplate::ReadXmlConfiguration(MXmlNode* Node)
+bool MSubModuleDEEOutput::ReadXmlConfiguration(MXmlNode* Node)
 {
   //! Read the configuration data from an XML node
 
@@ -127,12 +137,10 @@ bool MSubModuleTemplate::ReadXmlConfiguration(MXmlNode* Node)
 ////////////////////////////////////////////////////////////////////////////////
 
 
-MXmlNode* MSubModuleTemplate::CreateXmlConfiguration()
+MXmlNode* MSubModuleDEEOutput::CreateXmlConfiguration(MXmlNode* Node)
 {
   //! Create an XML node tree from the configuration
 
-  MXmlNode* Node = new MXmlNode(0, m_XmlTag);
-  
   /*
   MXmlNode* SomeTagNode = new MXmlNode(Node, "SomeTag", "SomeValue");
   */
@@ -141,5 +149,5 @@ MXmlNode* MSubModuleTemplate::CreateXmlConfiguration()
 }
 
 
-// MSubModuleTemplate.cxx: the end...
+// MSubModuleDEEOutput.cxx: the end...
 ////////////////////////////////////////////////////////////////////////////////

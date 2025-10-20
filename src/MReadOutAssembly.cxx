@@ -50,8 +50,9 @@ MReadOutAssembly::MReadOutAssembly() : MReadOutSequence(), m_EventTimeUTC(0)
 {
   // Construct an instance of MReadOutAssembly
 
-  m_PhysicalEvent = 0; // Set pointer to zero before delete
-  m_Aspect = 0;
+  m_PhysicalEvent = nullptr;
+  m_SimEvent = nullptr;
+  m_Aspect = nullptr;
  	m_HasSimAspectInfo = false;
  
   Clear();
@@ -94,11 +95,12 @@ MReadOutAssembly::~MReadOutAssembly()
   }
   m_GuardringHits.clear();
 
-  // Delete this instance of MReadOutAssembly
+  m_DEEStripHitsLV.clear();
+  m_DEEStripHitsHV.clear();
+
+  delete m_SimEvent;
   delete m_PhysicalEvent;
-  
   delete m_Aspect;
-//  mout<<"delete MReadOutAssembly!!\n" ;//debug
 }
 
 
@@ -175,14 +177,19 @@ void MReadOutAssembly::Clear()
   m_DepthCalibration_OutofRange = false;
   m_DepthCalibration_OutofRangeString = ""; 
 
-  
   m_FilteredOut = false;
 
   delete m_PhysicalEvent;
-  m_PhysicalEvent = 0;
-  
+  m_PhysicalEvent = nullptr;
+
+  m_DEEStripHitsLV.clear();
+  m_DEEStripHitsHV.clear();
+
+  delete m_SimEvent;
+  m_SimEvent = nullptr;
+
   delete m_Aspect;
-  m_Aspect = 0;
+  m_Aspect = nullptr;
 }
 
 
@@ -329,7 +336,7 @@ MHit* MReadOutAssembly::GetHit(unsigned int i)
 
   merr<<"Index out of bounds!"<<show;
 
-  return 0;
+  return nullptr;
 }
 
 
